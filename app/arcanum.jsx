@@ -75,11 +75,9 @@ function AuthScreen({ onLogin }) {
   setLoading(true); setError("");
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) { setError(error.message); setLoading(false); return; }
-  await supabase.from("dealers").insert({ email, uid: "ARC-0001" });
   onLogin(data.user);
   setLoading(false);
 };
-
   return (
     <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
