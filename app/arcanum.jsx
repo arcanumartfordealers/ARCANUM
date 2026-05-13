@@ -71,17 +71,14 @@ function AuthScreen({ onLogin }) {
     setLoading(false);
   };
 
-  const handleRegister = async () => {
-    setLoading(true); setError("");
-    const { data: inv } = await supabase.from("invitations").select("*").eq("email", email).eq("used", false).single();
-    if (!inv) { setError("Aucune invitation trouvée pour cet email."); setLoading(false); return; }
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) { setError(error.message); setLoading(false); return; }
-    const { data: inv } = await supabase.from("invitations").select("*").eq("email", email).single();
-    await supabase.from("invitations").update({ used: true }).eq("id", inv.id);
-    onLogin(data.user);
-    setLoading(false);
-  };
+ const handleRegister = async () => {
+  setLoading(true); setError("");
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) { setError(error.message); setLoading(false); return; }
+  await supabase.from("dealers").insert({ email, uid: "ARC-0001" });
+  onLogin(data.user);
+  setLoading(false);
+};
 
   return (
     <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
