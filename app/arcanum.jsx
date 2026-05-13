@@ -77,7 +77,7 @@ function AuthScreen({ onLogin }) {
     if (!inv) { setError("Aucune invitation trouvée pour cet email."); setLoading(false); return; }
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) { setError(error.message); setLoading(false); return; }
-    await supabase.from("dealers").insert({ email, uid: inv.uid, invited_by: inv.invited_by });
+    const { data: inv } = await supabase.from("invitations").select("*").eq("email", email).single();
     await supabase.from("invitations").update({ used: true }).eq("id", inv.id);
     onLogin(data.user);
     setLoading(false);
