@@ -149,21 +149,14 @@ function AuthScreen({ onLogin }) {
   );
 }
 
-const AUTO_REPLIES = [
-  "Très intéressant, pouvez-vous m'en dire plus sur la provenance ?",
-  "Je vais vérifier dans mon inventaire et vous reviens rapidement.",
-  "Le prix est-il négociable ?",
-  "J'ai justement un client qui cherche ce type d'œuvre.",
-  "La pièce est disponible. Souhaitez-vous le certificat d'authenticité ?",
-];
-
-function ChatPanel({ target, onClose }) {
+function ChatPanel({ target, currentDealer, onClose }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
-  const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
-  const now = () => { const d = new Date(); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const fmt = (ts) => { const d = new Date(ts); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const myId = currentDealer?.id;
+  const theirId = target?.id;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -172,29 +165,44 @@ function ChatPanel({ target, onClose }) {
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
+  useEffect(() => {
+    if (!myId || !theirId) return;
+    const load = async () => {
+      const { data } = await supabase.from("messages").select("*")
+        .or(`and(from_dealer.eq.${myId},to_dealer.eq.${theirId}),and(from_dealer.eq.${theirId},to_dealer.eq.${myId})`)
+        .order("created_at", { ascending: true });
+      if (data) setMessages(data.map(r => ({ id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", text: r.text, time: fmt(r.created_at) })));
+    };
+    load();
+    const channel = supabase.channel(`chat-${[myId, theirId].sort().join("-")}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const r = payload.new;
+        const isConv = (String(r.from_dealer) === String(myId) && String(r.to_dealer) === String(theirId)) ||
+                       (String(r.from_dealer) === String(theirId) && String(r.to_dealer) === String(myId));
+        if (isConv) setMessages(m => [...m, { id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", text: r.text, time: fmt(r.created_at) }]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [myId, theirId]);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const send = async () => {
-    if (!input.trim()) return;
-    const msg = { from: "Moi", text: input.trim(), time: now() };
-    setMessages(m => [...m, msg]);
-    if (target?.id) await supabase.from("messages").insert({ to_dealer: target.id, text: input.trim() });
+    if (!input.trim() || !myId || !theirId) return;
+    const text = input.trim();
     setInput("");
-    if (target?.online) {
-      setIsTyping(true);
-      setTimeout(() => { setIsTyping(false); setMessages(m => [...m, { from: "them", text: AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)], time: now() }]); }, 1400 + Math.random() * 1800);
-    }
+    await supabase.from("messages").insert({ from_dealer: myId, to_dealer: theirId, text });
   };
 
   return (
     <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 400, background: "#0a0a0a", borderLeft: "1px solid #141414", zIndex: 150, display: "flex", flexDirection: "column" }}>
-      <style>{`@keyframes typingDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}} @keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}} .mb{animation:msgIn .25s ease both}`}</style>
+      <style>{`@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}} .mb{animation:msgIn .25s ease both}`}</style>
       <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#111", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 500 }}>{target?.uid?.slice(-2) || "??"}</div>
           <div>
             <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, letterSpacing: 2.5, color: "#bbb", textTransform: "uppercase" }}>{target?.uid}</div>
-            <div style={{ fontSize: 11, color: target?.online ? "#6eb87a" : "#333" }}>{target?.online ? "En ligne" : "Hors ligne"} · {target?.specialty}</div>
+            <div style={{ fontSize: 11, color: "#333" }}>{target?.specialty || "Marchand"}</div>
           </div>
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 18 }}>✕</button>
@@ -202,17 +210,12 @@ function ChatPanel({ target, onClose }) {
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.length === 0 && <div style={{ textAlign: "center", marginTop: 40, color: "#1a1a1a", fontSize: 13 }}>Début de la conversation</div>}
         {messages.map((msg, i) => {
-          const isMe = msg.from === "Moi";
-          return <div key={i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "78%" }}>
+          const isMe = msg.from === "me";
+          return <div key={msg.id || i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "78%" }}>
             <div style={{ background: isMe ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.04)", border: `1px solid ${isMe ? "rgba(255,255,255,0.14)" : "#141414"}`, padding: "10px 14px", borderRadius: isMe ? "8px 8px 2px 8px" : "8px 8px 8px 2px", fontSize: 14, lineHeight: 1.65, color: isMe ? "#fff" : "#999" }}>{msg.text}</div>
             <div style={{ fontSize: 10, color: "#1a1a1a", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
           </div>;
         })}
-        {isTyping && <div className="mb" style={{ alignSelf: "flex-start" }}>
-          <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #141414", padding: "12px 18px", borderRadius: "8px 8px 8px 2px", display: "flex", gap: 5 }}>
-            {[0, 1, 2].map(j => <div key={j} style={{ width: 6, height: 6, borderRadius: "50%", background: "#444", animation: `typingDot 1.2s ease ${j * .2}s infinite` }} />)}
-          </div>
-        </div>}
         <div ref={bottomRef} />
       </div>
       <div style={{ padding: "14px 16px", borderTop: "1px solid #111", display: "flex", gap: 8, alignItems: "flex-end" }}>
@@ -795,7 +798,7 @@ export default function Arcanum() {
         </div>}
       </main>
 
-      {chatOpen && chatTarget && <ChatPanel target={chatTarget} onClose={() => setChatOpen(false)} />}
+      {chatOpen && chatTarget && <ChatPanel target={chatTarget} currentDealer={currentDealer} onClose={() => setChatOpen(false)} />}
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} currentDealer={currentDealer} onSent={uid => toast(`Invitation envoyée · ${uid} réservé`)} />}
       {showContracts && <ContractModal onClose={() => setShowContracts(false)} />}
 
