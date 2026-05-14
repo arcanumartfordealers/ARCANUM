@@ -1,11 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+import { supabase } from "../lib/supabase";
 
 const DARK = "#080808";
 const CARD_BG = "rgba(12,12,12,0.97)";
@@ -71,13 +66,19 @@ function AuthScreen({ onLogin }) {
     setLoading(false);
   };
 
- const handleRegister = async () => {
-  setLoading(true); setError("");
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) { setError(error.message); setLoading(false); return; }
-  onLogin(data.user);
-  setLoading(false);
-};
+  const handleRegister = async () => {
+    setLoading(true); setError("");
+    const { data: inv } = await supabase.from("invitations").select("email").eq("email", email.trim().toLowerCase()).maybeSingle();
+    if (!inv) {
+      setError("Cette adresse n'est pas sur la liste d'invitations. Arcanum est un réseau fermé sur invitation uniquement.");
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) { setError(error.message); setLoading(false); return; }
+    onLogin(data.user);
+    setLoading(false);
+  };
   return (
     <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
@@ -421,7 +422,7 @@ export default function Arcanum() {
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:2px;} ::-webkit-scrollbar-thumb{background:#111;}
         input,textarea{font-family:'DM Sans',sans-serif!important;}
-        .nav-btn{background:none;border:none;color:#2a2a2a;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;padding:10px 14px;transition:color .2s;position:relative;text-transform:uppercase;}
+        .nav-btn{background:none;border:none;color:#888;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;padding:10px 14px;transition:color .2s;position:relative;text-transform:uppercase;}
         .nav-btn:hover{color:#fff;} .nav-btn.active{color:#fff;}
         .nav-btn.active::after{content:'';position:absolute;bottom:-1px;left:14px;right:14px;height:1px;background:#fff;}
         .card{background:${CARD_BG};border:1px solid #111;transition:border-color .2s,box-shadow .2s;}
