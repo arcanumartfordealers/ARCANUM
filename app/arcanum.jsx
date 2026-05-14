@@ -458,7 +458,7 @@ export default function Arcanum() {
               <path d="M103 38 L103 16 C106 11 110 12 111 18 L111 24 C113 11 118 11 119 18 L119 38" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M4 45 C30 43 60 46 100 44 C130 43 155 45 172 43" stroke="white" strokeWidth="0.7" strokeLinecap="round" opacity="0.28"/>
             </svg>
-            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 7.5, letterSpacing: 3, color: "#1a1a1a", textTransform: "uppercase" }}>Réseau Privé · {currentDealer?.uid || "..."}</div>
+            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 7.5, letterSpacing: 3, color: "#555", textTransform: "uppercase" }}>Réseau Privé · {currentDealer?.uid || "..."}</div>
           </div>
 
           <nav style={{ display: "flex" }}>
@@ -468,9 +468,9 @@ export default function Arcanum() {
           </nav>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button className="btn-ghost" onClick={() => setShowContracts(true)}>Contrats</button>
+            <button className="btn-ghost" style={{ color: "#888" }} onClick={() => setShowContracts(true)}>Contrats</button>
             <button className="btn-gold" onClick={() => setShowInvite(true)}>+ Inviter</button>
-            <button className="btn-ghost" onClick={() => supabase.auth.signOut()}>Déco</button>
+            <button className="btn-ghost" style={{ color: "#888" }} onClick={() => supabase.auth.signOut()}>Déco</button>
           </div>
         </div>
       </header>
@@ -481,10 +481,10 @@ export default function Arcanum() {
             <div onClick={() => setDirectOnly(!directOnly)} style={{ width: 34, height: 18, background: directOnly ? "rgba(255,255,255,.15)" : "rgba(255,255,255,.04)", border: `1px solid ${directOnly ? "#fff" : "#111"}`, borderRadius: 9, position: "relative", cursor: "pointer", transition: "all .25s" }}>
               <div style={{ position: "absolute", top: 2, left: directOnly ? 17 : 2, width: 12, height: 12, background: directOnly ? "#fff" : "#1a1a1a", borderRadius: "50%", transition: "left .25s" }} />
             </div>
-            <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2.5, color: directOnly ? "#fff" : "#222", textTransform: "uppercase" }}>Pièces directes uniquement</span>
+            <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2.5, color: directOnly ? "#fff" : "#888", textTransform: "uppercase" }}>Pièces directes uniquement</span>
           </label>
           <div style={{ width: 1, height: 14, background: "#0f0f0f" }} />
-          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "#1a1a1a" }}>Détenues en propre par le marchand ou par ses clients directs</span>
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "#888" }}>Détenues en propre par le marchand ou par ses clients directs</span>
         </div>
       </div>
 
