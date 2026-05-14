@@ -149,21 +149,24 @@ function AuthScreen({ onLogin }) {
   );
 }
 
-function ChatPanel({ target, currentDealer, onClose }) {
-  const [input, setInput] = useState("");
+const QUESTIONS = [
+  { key: "availability",    label: "L'œuvre est-elle toujours disponible ?",  answers: ["Oui, disponible", "Non, vendue", "Bloquée pour une offre en cours"] },
+  { key: "offer_possible",  label: "Est-il possible de faire une offre ?",     answers: ["Oui", "Non"] },
+  { key: "location",        label: "Où est l'œuvre ?",                          type: "select", cities: ["Paris", "Londres", "New York", "Genève", "Zurich", "Hong Kong", "Dubaï", "Monaco", "Berlin", "Milan", "Madrid", "Tokyo", "Los Angeles", "Bruxelles", "Amsterdam"] },
+  { key: "condition_report", label: "Avez-vous un condition report ?",          answers: ["Oui, je peux le partager", "Non"] },
+];
+
+function ChatPanel({ target, currentDealer, artwork, onClose }) {
   const [messages, setMessages] = useState([]);
+  const [offerOpen, setOfferOpen] = useState(false);
+  const [offerDiscount, setOfferDiscount] = useState(0);
+  const [offerManual, setOfferManual] = useState("");
+  const [locationChoice, setLocationChoice] = useState("");
   const bottomRef = useRef(null);
-  const inputRef = useRef(null);
-  const fmt = (ts) => { const d = new Date(ts); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const myId = currentDealer?.id;
   const theirId = target?.id;
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (window.__arcanum_prefill__) { setInput(window.__arcanum_prefill__); window.__arcanum_prefill__ = null; inputRef.current?.focus(); }
-    }, 80);
-    return () => clearTimeout(t);
-  }, []);
+  const fmt = ts => { const d = new Date(ts); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const tryParse = text => { try { return JSON.parse(text); } catch { return { type: "text", value: text }; } };
 
   useEffect(() => {
     if (!myId || !theirId) return;
@@ -171,61 +174,141 @@ function ChatPanel({ target, currentDealer, onClose }) {
       const { data } = await supabase.from("messages").select("*")
         .or(`and(from_dealer.eq.${myId},to_dealer.eq.${theirId}),and(from_dealer.eq.${theirId},to_dealer.eq.${myId})`)
         .order("created_at", { ascending: true });
-      if (data) setMessages(data.map(r => ({ id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", text: r.text, time: fmt(r.created_at) })));
+      if (data) setMessages(data.map(r => ({ id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", parsed: tryParse(r.text), time: fmt(r.created_at) })));
     };
     load();
     const channel = supabase.channel(`chat-${[myId, theirId].sort().join("-")}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const r = payload.new;
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: r }) => {
         const isConv = (String(r.from_dealer) === String(myId) && String(r.to_dealer) === String(theirId)) ||
                        (String(r.from_dealer) === String(theirId) && String(r.to_dealer) === String(myId));
-        if (isConv) setMessages(m => [...m, { id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", text: r.text, time: fmt(r.created_at) }]);
-      })
-      .subscribe();
+        if (isConv) setMessages(m => [...m, { id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", parsed: tryParse(r.text), time: fmt(r.created_at) }]);
+      }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [myId, theirId]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  const send = async () => {
-    if (!input.trim() || !myId || !theirId) return;
-    const text = input.trim();
-    setInput("");
-    await supabase.from("messages").insert({ from_dealer: myId, to_dealer: theirId, text });
+  const send = async (payload) => {
+    if (!myId || !theirId) return;
+    await supabase.from("messages").insert({ from_dealer: myId, to_dealer: theirId, text: JSON.stringify(payload) });
+  };
+
+  const last = messages[messages.length - 1];
+  const lp = last?.parsed;
+  const parsePrice = s => { const n = parseFloat((s || "").replace(/\s/g, "").replace(",", ".").replace(/[^0-9.]/g, "")); return isNaN(n) ? 0 : n; };
+  const basePrice = parsePrice(artwork?.price);
+  const offerAmount = basePrice > 0 ? Math.round(basePrice * (1 - offerDiscount / 100)) : parsePrice(offerManual);
+  const offerPermitted = messages.some(m => m.from === "them" && m.parsed?.type === "a" && m.parsed?.key === "offer_possible" && m.parsed?.value === "Oui");
+  const pendingMyOffer = last?.from === "me" && lp?.type === "offer";
+
+  const renderBubble = (msg, i) => {
+    const isMe = msg.from === "me";
+    const p = msg.parsed;
+    let label = "", text = "", accent = null;
+    if (p.type === "q") { label = "Question"; text = p.label; }
+    else if (p.type === "a") { label = "Réponse"; text = p.value; }
+    else if (p.type === "offer") { label = "Offre"; text = `${Number(p.amount).toLocaleString("fr-FR")} €${p.discount > 0 ? ` (−${p.discount}%)` : ""}`; accent = "#c9a96e"; }
+    else if (p.type === "offer_resp") { label = p.accepted ? "Offre acceptée" : "Offre refusée"; text = p.accepted ? `Montant convenu : ${Number(p.amount).toLocaleString("fr-FR")} €` : "Offre déclinée"; accent = p.accepted ? "#6eb87a" : "#dc5050"; }
+    else { text = p.value || ""; }
+    return (
+      <div key={msg.id || i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "82%" }}>
+        {label && <div style={{ fontSize: 8, color: accent || "#333", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4, textAlign: isMe ? "right" : "left" }}>{label}</div>}
+        <div style={{ background: accent ? `${accent}14` : isMe ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.04)", border: `1px solid ${accent ? `${accent}44` : isMe ? "rgba(255,255,255,0.14)" : "#141414"}`, padding: "10px 14px", borderRadius: isMe ? "8px 8px 2px 8px" : "8px 8px 8px 2px", fontSize: 13, lineHeight: 1.65, color: accent || (isMe ? "#fff" : "#aaa") }}>{text}</div>
+        <div style={{ fontSize: 10, color: "#1a1a1a", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
+      </div>
+    );
+  };
+
+  const renderBottom = () => {
+    if (last?.from === "me" && (lp?.type === "q" || lp?.type === "offer")) {
+      return <div style={{ padding: "16px", borderTop: "1px solid #111", color: "#333", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", textAlign: "center", flexShrink: 0 }}>En attente de réponse…</div>;
+    }
+    if (last?.from === "them" && lp?.type === "q") {
+      const q = QUESTIONS.find(q => q.key === lp.key);
+      if (!q) return null;
+      return (
+        <div style={{ padding: "14px 16px", borderTop: "1px solid #111", flexShrink: 0 }}>
+          <div style={{ fontSize: 8, color: "#333", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Votre réponse</div>
+          {q.type === "select"
+            ? <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <select value={locationChoice} onChange={e => setLocationChoice(e.target.value)} style={{ background: "#0e0e0e", border: "1px solid #1a1a1a", color: locationChoice ? "#fff" : "#444", padding: "10px 14px", fontSize: 13, fontFamily: "'DM Sans',sans-serif", width: "100%", cursor: "pointer", outline: "none" }}>
+                  <option value="">Sélectionner une ville…</option>
+                  {q.cities.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button className="btn-gold" disabled={!locationChoice} onClick={() => { send({ type: "a", key: q.key, value: locationChoice }); setLocationChoice(""); }}>Envoyer</button>
+              </div>
+            : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {q.answers.map(a => <button key={a} className="btn-ghost" style={{ textAlign: "left" }} onClick={() => send({ type: "a", key: q.key, value: a })}>{a}</button>)}
+              </div>}
+        </div>
+      );
+    }
+    if (last?.from === "them" && lp?.type === "offer") {
+      return (
+        <div style={{ padding: "14px 16px", borderTop: "1px solid #111", flexShrink: 0 }}>
+          <div style={{ fontSize: 8, color: "#c9a96e", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Offre reçue : {Number(lp.amount).toLocaleString("fr-FR")} €</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-gold" style={{ flex: 1 }} onClick={() => send({ type: "offer_resp", accepted: true, amount: lp.amount })}>Accepter</button>
+            <button className="btn-ghost" style={{ flex: 1 }} onClick={() => send({ type: "offer_resp", accepted: false, amount: lp.amount })}>Refuser</button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div style={{ padding: "14px 16px", borderTop: "1px solid #111", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+        <div style={{ fontSize: 8, color: "#333", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>Questions</div>
+        {QUESTIONS.map(q => (
+          <button key={q.key} className="btn-ghost" style={{ textAlign: "left", fontSize: 12, padding: "8px 14px" }} onClick={() => send({ type: "q", key: q.key, label: q.label })}>{q.label}</button>
+        ))}
+        {offerPermitted && !pendingMyOffer && (
+          <button className="btn-gold" style={{ marginTop: 4 }} onClick={() => setOfferOpen(true)}>Faire une offre</button>
+        )}
+      </div>
+    );
   };
 
   return (
-    <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 400, background: "#0a0a0a", borderLeft: "1px solid #141414", zIndex: 150, display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", right: 0, top: 0, bottom: 0, width: 420, background: "#0a0a0a", borderLeft: "1px solid #141414", zIndex: 150, display: "flex", flexDirection: "column" }}>
       <style>{`@keyframes msgIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}} .mb{animation:msgIn .25s ease both}`}</style>
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#111", border: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 13, fontWeight: 500 }}>{target?.uid?.slice(-2) || "??"}</div>
           <div>
             <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, letterSpacing: 2.5, color: "#bbb", textTransform: "uppercase" }}>{target?.uid}</div>
-            <div style={{ fontSize: 11, color: "#333" }}>{target?.specialty || "Marchand"}</div>
+            {artwork ? <div style={{ fontSize: 11, color: "#444" }}>re : {artwork.title}</div> : <div style={{ fontSize: 11, color: "#333" }}>Marchand</div>}
           </div>
         </div>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#444", cursor: "pointer", fontSize: 18 }}>✕</button>
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages.length === 0 && <div style={{ textAlign: "center", marginTop: 40, color: "#1a1a1a", fontSize: 13 }}>Début de la conversation</div>}
-        {messages.map((msg, i) => {
-          const isMe = msg.from === "me";
-          return <div key={msg.id || i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "78%" }}>
-            <div style={{ background: isMe ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.04)", border: `1px solid ${isMe ? "rgba(255,255,255,0.14)" : "#141414"}`, padding: "10px 14px", borderRadius: isMe ? "8px 8px 2px 8px" : "8px 8px 8px 2px", fontSize: 14, lineHeight: 1.65, color: isMe ? "#fff" : "#999" }}>{msg.text}</div>
-            <div style={{ fontSize: 10, color: "#1a1a1a", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
-          </div>;
-        })}
+        {messages.length === 0 && <div style={{ textAlign: "center", marginTop: 40, color: "#1a1a1a", fontSize: 13 }}>Sélectionnez une question ci-dessous</div>}
+        {messages.map(renderBubble)}
         <div ref={bottomRef} />
       </div>
-      <div style={{ padding: "14px 16px", borderTop: "1px solid #111", display: "flex", gap: 8, alignItems: "flex-end" }}>
-        <textarea ref={inputRef} rows={1} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid #1a1a1a", color: "#fff", padding: "10px 14px", fontSize: 14, outline: "none", borderRadius: 4, resize: "none", fontFamily: "'DM Sans',sans-serif", lineHeight: 1.5, maxHeight: 100, overflowY: "auto" }}
-          placeholder="Votre message…" value={input}
-          onChange={e => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px"; }}
-          onFocus={e => e.target.style.borderColor = "#fff"} onBlur={e => e.target.style.borderColor = "#1a1a1a"}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }} />
-        <button onClick={send} style={{ background: input.trim() ? "#fff" : "rgba(255,255,255,0.06)", border: "none", borderRadius: 4, color: input.trim() ? "#080808" : "#222", cursor: input.trim() ? "pointer" : "default", padding: "10px 14px", fontSize: 14, fontWeight: "bold" }}>↑</button>
-      </div>
+      {renderBottom()}
+      {offerOpen && (
+        <div style={{ position: "absolute", inset: "0", background: "rgba(0,0,0,0.94)", display: "flex", alignItems: "center", justifyContent: "center", padding: 28, zIndex: 10 }}>
+          <div style={{ background: "#0c0c0c", border: "1px solid #1a1a1a", padding: 28, width: "100%" }}>
+            <div style={{ fontSize: 8, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 18 }}>Faire une offre</div>
+            {artwork && <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>{artwork.title}{artwork.artist ? ` — ${artwork.artist}` : ""}</div>}
+            {basePrice > 0 && <div style={{ fontSize: 11, color: "#333", marginBottom: 20 }}>Prix affiché : {basePrice.toLocaleString("fr-FR")} €</div>}
+            <div style={{ textAlign: "center", padding: "20px 0", borderTop: "1px solid #0f0f0f", borderBottom: "1px solid #0f0f0f", marginBottom: 20 }}>
+              <div style={{ fontSize: 8, color: "#333", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Votre offre</div>
+              {basePrice > 0
+                ? <>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 34, letterSpacing: 2 }}>{offerAmount.toLocaleString("fr-FR")} €</div>
+                    {offerDiscount > 0 && <div style={{ fontSize: 12, color: "#c9a96e", marginTop: 6 }}>−{offerDiscount}% par rapport au prix affiché</div>}
+                    <button className="btn-ghost" style={{ marginTop: 16, width: "100%" }} disabled={offerDiscount >= 50} onClick={() => setOfferDiscount(d => Math.min(d + 5, 50))}>− 5%</button>
+                  </>
+                : <input className="inp" type="number" placeholder="Montant en €" value={offerManual} onChange={e => setOfferManual(e.target.value)} style={{ width: "100%", textAlign: "center", fontSize: 20 }} />}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn-ghost" style={{ flex: 1 }} onClick={() => { setOfferOpen(false); setOfferDiscount(0); setOfferManual(""); }}>Annuler</button>
+              <button className="btn-gold" style={{ flex: 1 }} disabled={offerAmount === 0} onClick={() => { send({ type: "offer", amount: offerAmount, discount: offerDiscount, artwork_title: artwork?.title || "" }); setOfferOpen(false); setOfferDiscount(0); setOfferManual(""); }}>Envoyer l'offre</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -359,6 +442,8 @@ export default function Arcanum() {
   const [filterTag, setFilterTag] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatTarget, setChatTarget] = useState(null);
+  const [chatArtwork, setChatArtwork] = useState(null);
+  const openChat = (target, artwork = null) => { setChatTarget(target); setChatArtwork(artwork); setChatOpen(true); };
   const [showInvite, setShowInvite] = useState(false);
   const [showContracts, setShowContracts] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
@@ -594,7 +679,7 @@ export default function Arcanum() {
                         : <div style={{ width: "100%", aspectRatio: "4/3", background: "#0e0e0e", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
                             <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#1a1a1a" strokeWidth="1.2"/><path d="M9 11V8a5 5 0 0110 0v3" stroke="#1a1a1a" strokeWidth="1.2"/><circle cx="14" cy="18" r="2" fill="#1a1a1a"/></svg>
                             <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#1a1a1a", textTransform: "uppercase" }}>Photos sur demande</span>
-                            <button onClick={() => { setChatTarget(d); setChatOpen(true); setTimeout(() => { window.__arcanum_prefill__ = `Bonjour, je souhaite accéder aux photos de « ${w.title} » (${w.artist}, ${w.year}).`; }, 100); }}
+                            <button onClick={() => openChat(d, w)}
                               style={{ marginTop: 4, background: "none", border: "1px solid #111", color: "#2a2a2a", padding: "6px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase" }}
                               onMouseEnter={e => { e.currentTarget.style.borderColor = "#fff"; e.currentTarget.style.color = "#fff"; }}
                               onMouseLeave={e => { e.currentTarget.style.borderColor = "#111"; e.currentTarget.style.color = "#2a2a2a"; }}>Demander l'accès</button>
@@ -627,7 +712,7 @@ export default function Arcanum() {
                     <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
                       {isOwn
                         ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(w.id, "inventory")}>🗑</button>
-                        : <><button className="btn-danger" onClick={() => { setReportTarget(w); setReportType("inventory"); }}>⚑</button><button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Contacter</button></>}
+                        : <><button className="btn-danger" onClick={() => { setReportTarget(w); setReportType("inventory"); }}>⚑</button><button className="btn-ghost" onClick={() => openChat(d, w)}>Contacter</button></>}
                     </div>
                   </div>
                 </div>
@@ -670,7 +755,7 @@ export default function Arcanum() {
                     <div style={{ display: "flex", gap: 6 }}>
                       {isOwnSearch
                         ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(s.id, "searches")}>🗑</button>
-                        : <><button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button><button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Je peux aider</button></>}
+                        : <><button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button><button className="btn-ghost" onClick={() => openChat(d)}>Je peux aider</button></>}
                     </div>
                   </div>
                 </div>
@@ -735,8 +820,8 @@ export default function Arcanum() {
                   </div>
                 </div>
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #0a0a0a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                  {dealer(s.dealer_id)?.id !== currentDealer?.id && <button className="btn-ghost" onClick={() => { setChatTarget(dealer(s.dealer_id)); setChatOpen(true); }}>Contacter le chercheur</button>}
-                  {dealer(w.dealer_id)?.id !== currentDealer?.id && <button className="btn-gold" onClick={() => { setChatTarget(dealer(w.dealer_id)); setChatOpen(true); }}>Contacter le vendeur</button>}
+                  {dealer(s.dealer_id)?.id !== currentDealer?.id && <button className="btn-ghost" onClick={() => openChat(dealer(s.dealer_id))}>Contacter le chercheur</button>}
+                  {dealer(w.dealer_id)?.id !== currentDealer?.id && <button className="btn-gold" onClick={() => openChat(dealer(w.dealer_id), w)}>Contacter le vendeur</button>}
                 </div>
               </div>
             ))}
@@ -757,7 +842,7 @@ export default function Arcanum() {
                   {d.verified && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", border: "1px solid #fff", color: "#fff", textTransform: "uppercase" }}>Vérifié</span>}
                 </div>
                 <div style={{ fontSize: 12, color: "#1a1a1a", marginBottom: 14 }}>{inventory.filter(w => w.dealer_id === d.id).length} œuvres · {searches.filter(s => s.dealer_id === d.id).length} recherches</div>
-                {d.id !== currentDealer?.id ? <button className="btn-ghost" style={{ width: "100%" }} onClick={() => { setChatTarget(d); setChatOpen(true); }}>Message</button>
+                {d.id !== currentDealer?.id ? <button className="btn-ghost" style={{ width: "100%" }} onClick={() => openChat(d)}>Message</button>
                   : <div style={{ fontSize: 11, color: "#222", textTransform: "uppercase", letterSpacing: 2 }}>Vous</div>}
               </div>
             ))}
@@ -771,7 +856,7 @@ export default function Arcanum() {
           <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {dealers.filter(d => d.id !== currentDealer?.id).map(d => (
               <div key={d.id} style={{ background: CARD_BG, border: "1px solid #0f0f0f", padding: "18px 22px", cursor: "pointer", display: "flex", gap: 16, alignItems: "center", transition: "border-color .2s" }}
-                onClick={() => { setChatTarget(d); setChatOpen(true); }}
+                onClick={() => openChat(d)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = "#111"}
                 onMouseLeave={e => e.currentTarget.style.borderColor = "#0f0f0f"}>
                 <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#111", border: "1px solid #111", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 500 }}>{d.uid?.slice(-2)}</div>
@@ -827,7 +912,7 @@ export default function Arcanum() {
         </div>}
       </main>
 
-      {chatOpen && chatTarget && <ChatPanel target={chatTarget} currentDealer={currentDealer} onClose={() => setChatOpen(false)} />}
+      {chatOpen && chatTarget && <ChatPanel target={chatTarget} currentDealer={currentDealer} artwork={chatArtwork} onClose={() => { setChatOpen(false); setChatArtwork(null); }} />}
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} currentDealer={currentDealer} onSent={uid => toast(`Invitation envoyée · ${uid} réservé`)} />}
       {showContracts && <ContractModal onClose={() => setShowContracts(false)} />}
 
@@ -983,7 +1068,7 @@ export default function Arcanum() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 22, fontWeight: 500, color: "#fff" }}>{w.price}</span>
                   <div style={{ display: "flex", gap: 10 }}>
-                    {!isOwn && <button className="btn-gold" onClick={() => { setSelectedWork(null); setChatTarget(d); setChatOpen(true); }}>Contacter</button>}
+                    {!isOwn && <button className="btn-gold" onClick={() => { setSelectedWork(null); openChat(d, w); }}>Contacter</button>}
                     <button className="btn-ghost" onClick={() => setSelectedWork(null)}>Fermer</button>
                   </div>
                 </div>
