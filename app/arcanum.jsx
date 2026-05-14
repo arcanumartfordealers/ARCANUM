@@ -358,8 +358,19 @@ export default function Arcanum() {
   }, []);
 
   const loadDealer = async (u) => {
-    const { data } = await supabase.from("dealers").select("*").eq("email", u.email).single();
-    if (data) setCurrentDealer(data);
+    const { data } = await supabase.from("dealers").select("*").eq("email", u.email).maybeSingle();
+    if (data) {
+      setCurrentDealer(data);
+    } else {
+      const uid = `ARC-${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const { data: created, error } = await supabase
+        .from("dealers")
+        .insert({ email: u.email, uid })
+        .select()
+        .single();
+      if (created) setCurrentDealer(created);
+      else console.error("Erreur création profil dealer :", error);
+    }
   };
 
   useEffect(() => {
@@ -511,7 +522,7 @@ export default function Arcanum() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(290px,1fr))", gap: 18 }}>
             {filteredInv.map((w, i) => {
               const d = dealer(w.dealer_id);
-              const isOwn = w.dealer_id === currentDealer?.id;
+              const isOwn = currentDealer && String(w.dealer_id) === String(currentDealer.id);
               return <div key={w.id} className="card fade-up" style={{ animationDelay: `${i * 60}ms` }}>
                 <div style={{ position: "relative", overflow: "hidden" }}>
                   {isOwn ? <WatermarkedImage color="#6a5545" uid={currentDealer?.uid} /> :
@@ -569,7 +580,7 @@ export default function Arcanum() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {filteredSearches.map((s, i) => {
               const d = dealer(s.dealer_id);
-              const isOwnSearch = s.dealer_id === currentDealer?.id;
+              const isOwnSearch = currentDealer && String(s.dealer_id) === String(currentDealer.id);
               return <div key={s.id} className="card fade-up" style={{ padding: "22px 26px", animationDelay: `${i * 60}ms`, display: "flex", gap: 22, alignItems: "flex-start" }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#111", border: "1px solid #111", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{d?.uid?.slice(-2) || "??"}</div>
                 <div style={{ flex: 1 }}>
