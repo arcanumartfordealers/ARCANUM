@@ -42,12 +42,12 @@ function WatermarkedImage({ color = "#5a4535", uid = "ARC-0041" }) {
         ctx.fillText(`ARCANUM · ${uid} · CONFIDENTIEL`, col * 160, row * 50);
     ctx.restore();
     ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(0, H / 2 - 14, W, 28);
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.font = "8px sans-serif";
+    ctx.fillRect(0, H / 2 - 16, W, 32);
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "14px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`© ARCANUM RÉSEAU PRIVÉ · ${uid} · NE PAS DIFFUSER`, W / 2, H / 2);
+    ctx.fillText("ARCANUM · CONFIDENTIEL · NE PAS DIFFUSER", W / 2, H / 2);
   }, [color, uid]);
   return <canvas ref={canvasRef} width={320} height={220} style={{ width: "100%", height: "auto", display: "block", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />;
 }
@@ -77,12 +77,12 @@ function WatermarkedPhoto({ src, uid = "ARC-0041" }) {
           ctx.fillText(`ARCANUM · ${uid} · CONFIDENTIEL`, col * 240, row * 56);
       ctx.restore();
       ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(0, H / 2 - 14, W, 28);
-      ctx.fillStyle = "rgba(255,255,255,0.38)";
-      ctx.font = "9px sans-serif";
+      ctx.fillRect(0, H / 2 - 16, W, 32);
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "14px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(`© ARCANUM RÉSEAU PRIVÉ · ${uid} · NE PAS DIFFUSER`, W / 2, H / 2);
+      ctx.fillText("ARCANUM · CONFIDENTIEL · NE PAS DIFFUSER", W / 2, H / 2);
     };
     img.onerror = () => {
       canvas.width = 320; canvas.height = 220;
