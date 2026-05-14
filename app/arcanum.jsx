@@ -340,7 +340,7 @@ export default function Arcanum() {
   const [addItem, setAddItem] = useState(false);
   const [addSearch, setAddSearch] = useState(false);
   const [notif, setNotif] = useState(null);
-  const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true });
+  const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false });
   const [newSearch, setNewSearch] = useState({ title: "", period: "", budget: "", tags: "", direct: true });
 
   const toast = msg => { setNotif(msg); setTimeout(() => setNotif(null), 3200); };
@@ -384,8 +384,14 @@ export default function Arcanum() {
 
   const submitItem = async () => {
     if (!newItem.title || !newItem.artist) return;
-    await supabase.from("inventory").insert({ title: newItem.title, artist: newItem.artist, year: parseInt(newItem.year) || new Date().getFullYear(), medium: newItem.medium, price: newItem.price, dealer_id: currentDealer?.id, direct: newItem.direct, tags: newItem.tags.split(",").map(t => t.trim()).filter(Boolean), status: "available" });
-    loadInventory(); setNewItem({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true }); setAddItem(false); toast("Œuvre ajoutée");
+    await supabase.from("inventory").insert({ title: newItem.title, artist: newItem.artist, year: parseInt(newItem.year) || new Date().getFullYear(), medium: newItem.medium, price: newItem.price, dealer_id: currentDealer?.id, direct: newItem.direct, tags: newItem.tags.split(",").map(t => t.trim()).filter(Boolean), status: "available", dimensions: newItem.dimensions || null, weight: newItem.weight || null, condition: newItem.condition || null, certificate: newItem.certificate });
+    loadInventory(); setNewItem({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false }); setAddItem(false); toast("Œuvre ajoutée");
+  };
+
+  const deleteItem = async (id, table) => {
+    await supabase.from(table).delete().eq("id", id);
+    table === "inventory" ? loadInventory() : loadSearches();
+    toast("Supprimé");
   };
 
   const submitSearch = async () => {
@@ -518,15 +524,24 @@ export default function Arcanum() {
                         onMouseLeave={e => { e.currentTarget.style.borderColor = "#111"; e.currentTarget.style.color = "#2a2a2a"; }}>Demander l'accès</button>
                     </div>}
                   {w.direct && <div style={{ position: "absolute", top: 10, left: 10 }}><span className="direct-badge">Directe</span></div>}
+                  {isOwn && <div style={{ position: "absolute", top: 10, right: 10 }}><span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(201,169,110,.12)", border: "1px solid rgba(201,169,110,.4)", color: "#c9a96e", textTransform: "uppercase" }}>Mon œuvre</span></div>}
                 </div>
                 <div style={{ padding: "18px 20px 20px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                    <div><div style={{ fontSize: 16, color: "#ccc" }}>{w.title}</div><div style={{ fontSize: 13, color: "#333", marginTop: 2 }}>{w.artist}{w.year ? `, ${w.year}` : ""}</div></div>
+                    <div><div style={{ fontSize: 16, color: "#ccc" }}>{w.title}</div><div style={{ fontSize: 13, color: "#555", marginTop: 2 }}>{w.artist}{w.year ? `, ${w.year}` : ""}</div></div>
                     <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "3px 7px", border: `1px solid ${w.status === "available" ? "#fff" : w.status === "reserved" ? "#6e8ec9" : "#dc5050"}`, color: w.status === "available" ? "#fff" : w.status === "reserved" ? "#6e8ec9" : "#dc5050", height: "fit-content", whiteSpace: "nowrap", textTransform: "uppercase" }}>
                       {w.status === "available" ? "Disponible" : w.status === "reserved" ? "Réservé" : "Vendu"}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: "#1a1a1a", marginBottom: 10 }}>{w.medium}</div>
+                  <div style={{ fontSize: 12, color: "#555", marginBottom: 6 }}>{w.medium}</div>
+                  {(w.dimensions || w.weight) && <div style={{ display: "flex", gap: 14, marginBottom: 6 }}>
+                    {w.dimensions && <span style={{ fontSize: 11, color: "#555" }}>{w.dimensions}</span>}
+                    {w.weight && <span style={{ fontSize: 11, color: "#555" }}>{w.weight}</span>}
+                  </div>}
+                  {(w.condition || w.certificate) && <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                    {w.condition && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", border: `1px solid ${w.condition === "Excellent" ? "rgba(110,184,122,.4)" : w.condition === "Bon" ? "rgba(255,255,255,.15)" : "rgba(201,169,110,.4)"}`, color: w.condition === "Excellent" ? "#6eb87a" : w.condition === "Bon" ? "#888" : "#c9a96e", textTransform: "uppercase" }}>{w.condition}</span>}
+                    {w.certificate && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", border: "1px solid rgba(255,255,255,.15)", color: "#888", textTransform: "uppercase" }}>Certificat</span>}
+                  </div>}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 16, fontWeight: 500 }}>{w.price}</span>
                     <span className="uid-badge">{d?.uid || "—"}</span>
@@ -534,8 +549,9 @@ export default function Arcanum() {
                   <div style={{ borderTop: "1px solid #0a0a0a", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>{(w.tags || []).slice(0, 2).map(t => <span key={t} className="tag" style={{ cursor: "default" }}>{t}</span>)}</div>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn-danger" onClick={() => { setReportTarget(w); setReportType("inventory"); }}>⚑</button>
-                      <button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Contacter</button>
+                      {isOwn
+                        ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(w.id, "inventory")}>🗑</button>
+                        : <><button className="btn-danger" onClick={() => { setReportTarget(w); setReportType("inventory"); }}>⚑</button><button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Contacter</button></>}
                     </div>
                   </div>
                 </div>
@@ -553,26 +569,32 @@ export default function Arcanum() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {filteredSearches.map((s, i) => {
               const d = dealer(s.dealer_id);
+              const isOwnSearch = s.dealer_id === currentDealer?.id;
               return <div key={s.id} className="card fade-up" style={{ padding: "22px 26px", animationDelay: `${i * 60}ms`, display: "flex", gap: 22, alignItems: "flex-start" }}>
                 <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#111", border: "1px solid #111", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{d?.uid?.slice(-2) || "??"}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                     <div><div style={{ fontSize: 16, color: "#ccc", marginBottom: 4 }}>{s.title}</div>
-                      <span className="uid-badge">{d?.uid || "—"}</span></div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <span className="uid-badge">{d?.uid || "—"}</span>
+                        {isOwnSearch && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(201,169,110,.12)", border: "1px solid rgba(201,169,110,.4)", color: "#c9a96e", textTransform: "uppercase" }}>Ma recherche</span>}
+                      </div>
+                    </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       {s.direct && <span className="direct-badge">Directe</span>}
                       {s.urgent && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, padding: "2px 8px", border: "1px solid rgba(220,80,80,.5)", color: "#dc5050", textTransform: "uppercase" }}>Urgent</span>}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 28, marginBottom: 12 }}>
-                    {s.period && <div><span style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: 2, textTransform: "uppercase" }}>Période </span><span style={{ fontSize: 14, color: "#666" }}>{s.period}</span></div>}
-                    {s.budget && <div><span style={{ fontSize: 9, color: "#1a1a1a", letterSpacing: 2, textTransform: "uppercase" }}>Budget </span><span style={{ fontSize: 14, color: "#fff" }}>{s.budget}</span></div>}
+                    {s.period && <div><span style={{ fontSize: 9, color: "#555", letterSpacing: 2, textTransform: "uppercase" }}>Période </span><span style={{ fontSize: 14, color: "#888" }}>{s.period}</span></div>}
+                    {s.budget && <div><span style={{ fontSize: 9, color: "#555", letterSpacing: 2, textTransform: "uppercase" }}>Budget </span><span style={{ fontSize: 14, color: "#fff" }}>{s.budget}</span></div>}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>{(s.tags || []).map(t => <span key={t} className="tag" style={{ cursor: "default" }}>{t}</span>)}</div>
                     <div style={{ display: "flex", gap: 6 }}>
-                      <button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button>
-                      <button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Je peux aider</button>
+                      {isOwnSearch
+                        ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(s.id, "searches")}>🗑</button>
+                        : <><button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button><button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Je peux aider</button></>}
                     </div>
                   </div>
                 </div>
@@ -697,11 +719,31 @@ export default function Arcanum() {
           <h2 style={styles.modalTitle}>Ajouter une œuvre</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[["title", "Titre *"], ["artist", "Artiste *"], ["year", "Année"], ["medium", "Technique / support"], ["price", "Prix"], ["tags", "Tags (séparés par virgule)"]].map(([k, ph]) => <input key={k} className="inp" placeholder={ph} value={newItem[k]} onChange={e => setNewItem({ ...newItem, [k]: e.target.value })} />)}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <input className="inp" placeholder="Dimensions (ex: 120 × 80 cm)" value={newItem.dimensions} onChange={e => setNewItem({ ...newItem, dimensions: e.target.value })} />
+              <input className="inp" placeholder="Poids (ex: 3,2 kg)" value={newItem.weight} onChange={e => setNewItem({ ...newItem, weight: e.target.value })} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>État de conservation</div>
+                <select className="inp" style={{ cursor: "pointer" }} value={newItem.condition} onChange={e => setNewItem({ ...newItem, condition: e.target.value })}>
+                  {["Excellent", "Bon", "Moyen"].map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Certificat d'authenticité</div>
+                <div style={{ display: "flex", gap: 1 }}>
+                  {[["Oui", true], ["Non", false]].map(([l, v]) => (
+                    <button key={l} onClick={() => setNewItem({ ...newItem, certificate: v })} style={{ flex: 1, background: newItem.certificate === v ? "#fff" : "none", border: "1px solid #1a1a1a", color: newItem.certificate === v ? "#080808" : "#555", padding: "10px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>{l}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "10px 0" }}>
               <div onClick={() => setNewItem({ ...newItem, direct: !newItem.direct })} style={{ width: 32, height: 18, background: newItem.direct ? "rgba(255,255,255,.15)" : "rgba(255,255,255,.04)", border: `1px solid ${newItem.direct ? "#fff" : "#111"}`, borderRadius: 9, position: "relative", cursor: "pointer" }}>
                 <div style={{ position: "absolute", top: 2, left: newItem.direct ? 15 : 2, width: 12, height: 12, background: newItem.direct ? "#fff" : "#1a1a1a", borderRadius: "50%", transition: "left .25s" }} />
               </div>
-              <span style={{ fontSize: 9, letterSpacing: 2, color: newItem.direct ? "#fff" : "#222", textTransform: "uppercase" }}>Pièce directe</span>
+              <span style={{ fontSize: 9, letterSpacing: 2, color: newItem.direct ? "#fff" : "#555", textTransform: "uppercase" }}>Pièce directe</span>
             </label>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
