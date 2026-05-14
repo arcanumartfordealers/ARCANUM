@@ -107,17 +107,9 @@ function AuthScreen({ onLogin }) {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
       <div style={{ width: 400, padding: 40, background: "#FFFDF8", border: "1px solid #E0D8C8" }}>
         <div style={{ marginBottom: 32 }}>
-          <svg width="160" height="44" viewBox="0 0 180 52" fill="none">
-            <path d="M6 40 L16 7 L26 40" stroke="#1a1a1a" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M10 27 L22 26.5" stroke="#1a1a1a" strokeWidth="1.1" strokeLinecap="round"/>
-            <path d="M30 40 L30 18 C30 16 31 14 33 13 C35 12 37 13 37 15" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M50 16 C46 13 40 14 39 21 C38 28 41 35 46 36 C49 37 52 35 53 32" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round"/>
-            <path d="M68 17 C64 13 57 15 56 22 C55 29 58 36 63 36 C67 37 70 34 70 29 L70 17 L70 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M74 38 L74 16 C77 11 82 12 83 17 L83 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M88 16 L88 30 C88 35 91 38 95 36 C98 34 99 29 99 16" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M99 30 L99 39" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round"/>
-            <path d="M103 38 L103 16 C106 11 110 12 111 18 L111 24 C113 11 118 11 119 18 L119 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4 45 C30 43 60 46 100 44 C130 43 155 45 172 43" stroke="#1a1a1a" strokeWidth="0.7" strokeLinecap="round" opacity="0.2"/>
+          <svg width="160" height="44" viewBox="0 0 220 66" fill="none">
+            <path d="M 8,48 C 8,41 12,24 18,10 C 21,4 26,4 25,14 C 24,24 19,36 18,44 C 17,49 21,52 26,49 C 28,47 31,41 33,34 C 35,26 40,22 44,28 C 47,33 46,42 46,48 C 47,50 51,51 53,47 C 55,41 57,28 56,24 C 55,20 52,22 52,29 C 52,37 56,45 61,47 C 63,49 67,49 69,45 C 71,39 73,27 79,25 C 84,24 88,29 88,37 C 88,43 85,48 81,48 C 77,48 75,44 77,40 C 78,38 82,40 87,44 C 89,46 92,44 94,38 C 97,30 101,26 105,29 C 109,32 109,42 110,48 C 111,44 112,36 114,27 C 116,21 121,20 124,28 C 127,36 126,46 127,50 C 128,46 129,36 131,26 C 131,36 134,44 136,46 C 140,49 142,45 144,26 C 146,18 150,20 152,28 C 154,36 153,46 154,52 C 155,48 157,38 159,26 C 161,18 165,18 167,26 C 169,36 168,46 169,52 C 170,48 172,38 174,26 C 176,19 180,19 182,28 C 184,37 183,49 184,55 C 186,57 196,56 214,52" stroke="#1a1a1a" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M 5,61 C 55,59 120,62 178,60 C 200,59 213,61 218,59" stroke="#1a1a1a" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.25"/>
           </svg>
           <div style={{ fontSize: 9, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase", marginTop: 4 }}>Réseau Privé</div>
         </div>
@@ -597,17 +589,9 @@ export default function Arcanum() {
       <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(245,240,232,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E8E0D0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <svg width="160" height="44" viewBox="0 0 180 52" fill="none">
-              <path d="M6 40 L16 7 L26 40" stroke="#1a1a1a" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M10 27 L22 26.5" stroke="#1a1a1a" strokeWidth="1.1" strokeLinecap="round"/>
-              <path d="M30 40 L30 18 C30 16 31 14 33 13 C35 12 37 13 37 15" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M50 16 C46 13 40 14 39 21 C38 28 41 35 46 36 C49 37 52 35 53 32" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round"/>
-              <path d="M68 17 C64 13 57 15 56 22 C55 29 58 36 63 36 C67 37 70 34 70 29 L70 17 L70 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M74 38 L74 16 C77 11 82 12 83 17 L83 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M88 16 L88 30 C88 35 91 38 95 36 C98 34 99 29 99 16" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M99 30 L99 39" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round"/>
-              <path d="M103 38 L103 16 C106 11 110 12 111 18 L111 24 C113 11 118 11 119 18 L119 38" stroke="#1a1a1a" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M4 45 C30 43 60 46 100 44 C130 43 155 45 172 43" stroke="#1a1a1a" strokeWidth="0.7" strokeLinecap="round" opacity="0.2"/>
+            <svg width="160" height="44" viewBox="0 0 220 66" fill="none">
+              <path d="M 8,48 C 8,41 12,24 18,10 C 21,4 26,4 25,14 C 24,24 19,36 18,44 C 17,49 21,52 26,49 C 28,47 31,41 33,34 C 35,26 40,22 44,28 C 47,33 46,42 46,48 C 47,50 51,51 53,47 C 55,41 57,28 56,24 C 55,20 52,22 52,29 C 52,37 56,45 61,47 C 63,49 67,49 69,45 C 71,39 73,27 79,25 C 84,24 88,29 88,37 C 88,43 85,48 81,48 C 77,48 75,44 77,40 C 78,38 82,40 87,44 C 89,46 92,44 94,38 C 97,30 101,26 105,29 C 109,32 109,42 110,48 C 111,44 112,36 114,27 C 116,21 121,20 124,28 C 127,36 126,46 127,50 C 128,46 129,36 131,26 C 131,36 134,44 136,46 C 140,49 142,45 144,26 C 146,18 150,20 152,28 C 154,36 153,46 154,52 C 155,48 157,38 159,26 C 161,18 165,18 167,26 C 169,36 168,46 169,52 C 170,48 172,38 174,26 C 176,19 180,19 182,28 C 184,37 183,49 184,55 C 186,57 196,56 214,52" stroke="#1a1a1a" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M 5,61 C 55,59 120,62 178,60 C 200,59 213,61 218,59" stroke="#1a1a1a" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.25"/>
             </svg>
             <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 7.5, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase" }}>Réseau Privé · {currentDealer?.uid || "..."}</div>
           </div>
