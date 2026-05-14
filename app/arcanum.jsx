@@ -104,13 +104,10 @@ function AuthScreen({ onLogin }) {
   };
   return (
     <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300&family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
       <div style={{ width: 400, padding: 40, background: "#FFFDF8", border: "1px solid #E0D8C8" }}>
         <div style={{ marginBottom: 32 }}>
-          <svg width="160" height="44" viewBox="0 0 220 66" fill="none">
-            <path d="M 8,48 C 8,41 12,24 18,10 C 21,4 26,4 25,14 C 24,24 19,36 18,44 C 17,49 21,52 26,49 C 28,47 31,41 33,34 C 35,26 40,22 44,28 C 47,33 46,42 46,48 C 47,50 51,51 53,47 C 55,41 57,28 56,24 C 55,20 52,22 52,29 C 52,37 56,45 61,47 C 63,49 67,49 69,45 C 71,39 73,27 79,25 C 84,24 88,29 88,37 C 88,43 85,48 81,48 C 77,48 75,44 77,40 C 78,38 82,40 87,44 C 89,46 92,44 94,38 C 97,30 101,26 105,29 C 109,32 109,42 110,48 C 111,44 112,36 114,27 C 116,21 121,20 124,28 C 127,36 126,46 127,50 C 128,46 129,36 131,26 C 131,36 134,44 136,46 C 140,49 142,45 144,26 C 146,18 150,20 152,28 C 154,36 153,46 154,52 C 155,48 157,38 159,26 C 161,18 165,18 167,26 C 169,36 168,46 169,52 C 170,48 172,38 174,26 C 176,19 180,19 182,28 C 184,37 183,49 184,55 C 186,57 196,56 214,52" stroke="#1a1a1a" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M 5,61 C 55,59 120,62 178,60 C 200,59 213,61 218,59" stroke="#1a1a1a" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.25"/>
-          </svg>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, letterSpacing: 6, color: "#1a1a1a" }}>ARCANUM</div>
           <div style={{ fontSize: 9, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase", marginTop: 4 }}>Réseau Privé</div>
         </div>
 
@@ -561,7 +558,7 @@ export default function Arcanum() {
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", background: DARK, minHeight: "100vh", color: "#1a1a1a" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@200;300;400;500&family=Bebas+Neue&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300&family=DM+Sans:wght@200;300;400;500&family=Bebas+Neue&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:2px;} ::-webkit-scrollbar-thumb{background:#C8C0B0;}
         input,textarea{font-family:'DM Sans',sans-serif!important;}
@@ -589,10 +586,7 @@ export default function Arcanum() {
       <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(245,240,232,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E8E0D0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <svg width="160" height="44" viewBox="0 0 220 66" fill="none">
-              <path d="M 8,48 C 8,41 12,24 18,10 C 21,4 26,4 25,14 C 24,24 19,36 18,44 C 17,49 21,52 26,49 C 28,47 31,41 33,34 C 35,26 40,22 44,28 C 47,33 46,42 46,48 C 47,50 51,51 53,47 C 55,41 57,28 56,24 C 55,20 52,22 52,29 C 52,37 56,45 61,47 C 63,49 67,49 69,45 C 71,39 73,27 79,25 C 84,24 88,29 88,37 C 88,43 85,48 81,48 C 77,48 75,44 77,40 C 78,38 82,40 87,44 C 89,46 92,44 94,38 C 97,30 101,26 105,29 C 109,32 109,42 110,48 C 111,44 112,36 114,27 C 116,21 121,20 124,28 C 127,36 126,46 127,50 C 128,46 129,36 131,26 C 131,36 134,44 136,46 C 140,49 142,45 144,26 C 146,18 150,20 152,28 C 154,36 153,46 154,52 C 155,48 157,38 159,26 C 161,18 165,18 167,26 C 169,36 168,46 169,52 C 170,48 172,38 174,26 C 176,19 180,19 182,28 C 184,37 183,49 184,55 C 186,57 196,56 214,52" stroke="#1a1a1a" strokeWidth="1.2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M 5,61 C 55,59 120,62 178,60 C 200,59 213,61 218,59" stroke="#1a1a1a" strokeWidth="0.6" fill="none" strokeLinecap="round" opacity="0.25"/>
-            </svg>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, letterSpacing: 6, color: "#1a1a1a" }}>ARCANUM</div>
             <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 7.5, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase" }}>Réseau Privé · {currentDealer?.uid || "..."}</div>
           </div>
 
