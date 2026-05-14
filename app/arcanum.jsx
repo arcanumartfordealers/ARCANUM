@@ -680,39 +680,68 @@ export default function Arcanum() {
           </div>
         </div>}
 
-        {view === "match" && <div className="fade-up">
-          <div style={styles.sectionLabel}>Matching automatique</div>
-          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 3, marginBottom: 6 }}>Offres & Demandes</h1>
-          <p style={{ color: "#1a1a1a", fontSize: 14, marginBottom: 32 }}>Correspondances détectées entre inventaires et recherches</p>
-          {searches.map((s, i) => {
-            const match = inventory.find(w => (w.tags || []).some(t => (s.tags || []).includes(t)));
-            if (!match) return null;
-            return <div key={i} className="card fade-up" style={{ padding: 28, marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-                <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, letterSpacing: 2 }}>Match</div>
-                <div style={{ flex: 1, height: 1, background: "#1a1a1a" }} />
-                <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 2, color: "#6eb87a", border: "1px solid rgba(110,184,122,.3)", padding: "3px 10px", textTransform: "uppercase" }}>Correspondance</span>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr", gap: 12, alignItems: "center" }}>
-                <div style={{ background: "rgba(255,255,255,.02)", border: "1px solid #111", padding: 16 }}>
-                  <div style={{ fontSize: 9, color: "#1a1a1a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 3 }}>Recherche</div>
-                  <div style={{ fontSize: 15, color: "#bbb", marginBottom: 6 }}>{s.title}</div>
-                  <span className="uid-badge">{dealer(s.dealer_id)?.uid}</span>
+        {view === "match" && (() => {
+          const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, " ").trim();
+          const STOP = new Set(["les", "des", "une", "par", "sur", "son", "ses", "aux", "est", "que", "qui", "pas", "plus", "pour", "dans", "avec", "mais", "tout", "bien", "tres"]);
+          const tokenize = s => norm(s).split(/\s+/).filter(t => t.length >= 3 && !STOP.has(t));
+
+          const allMatches = [];
+          for (const s of searches) {
+            for (const w of inventory) {
+              const signals = new Set();
+              const sTags = (s.tags || []).map(norm).filter(Boolean);
+              const wTags = (w.tags || []).map(norm).filter(Boolean);
+              sTags.forEach(t => { if (wTags.includes(t)) signals.add(`#${t}`); });
+              const sTokens = tokenize(s.title || "");
+              const wCorpus = norm([w.title, w.artist, ...(w.tags || [])].join(" "));
+              sTokens.forEach(t => { if (wCorpus.includes(t)) signals.add(t); });
+              const wTokens = tokenize([w.title, w.artist].join(" "));
+              const sCorpus = norm([s.title, ...(s.tags || [])].join(" "));
+              wTokens.forEach(t => { if (sCorpus.includes(t)) signals.add(t); });
+              if (signals.size > 0) allMatches.push({ s, w, signals: [...signals], score: signals.size });
+            }
+          }
+          allMatches.sort((a, b) => b.score - a.score);
+
+          return <div className="fade-up">
+            <div style={styles.sectionLabel}>Matching automatique</div>
+            <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 3, marginBottom: 6 }}>Offres & Demandes</h1>
+            <p style={{ color: "#1a1a1a", fontSize: 14, marginBottom: 32 }}>{allMatches.length > 0 ? `${allMatches.length} correspondance${allMatches.length > 1 ? "s" : ""} détectée${allMatches.length > 1 ? "s" : ""}` : "Correspondances détectées entre inventaires et recherches"}</p>
+            {allMatches.length === 0 && <div style={{ color: "#222", textAlign: "center", padding: "60px 0", fontSize: 14 }}>Aucune correspondance détectée pour l'instant</div>}
+            {allMatches.map(({ s, w, signals, score }, i) => (
+              <div key={i} className="card fade-up" style={{ padding: 28, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, letterSpacing: 2 }}>Match</div>
+                  <div style={{ flex: 1, height: 1, background: "#1a1a1a" }} />
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {signals.map(sig => (
+                      <span key={sig} style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, color: sig.startsWith("#") ? "#c9a96e" : "#6eb87a", border: `1px solid ${sig.startsWith("#") ? "rgba(201,169,110,.3)" : "rgba(110,184,122,.3)"}`, padding: "2px 8px", textTransform: "uppercase" }}>{sig}</span>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ textAlign: "center", color: "#111", fontSize: 16 }}>⟷</div>
-                <div style={{ background: "rgba(110,184,122,.03)", border: "1px solid rgba(110,184,122,.1)", padding: 16 }}>
-                  <div style={{ fontSize: 9, color: "#1a1a1a", marginBottom: 8, textTransform: "uppercase", letterSpacing: 3 }}>Inventaire</div>
-                  <div style={{ fontSize: 15, color: "#bbb", marginBottom: 6 }}>{match.title} — {match.artist}</div>
-                  <div style={{ display: "flex", gap: 8 }}><span className="uid-badge">{dealer(match.dealer_id)?.uid}</span><span style={{ fontSize: 13, fontWeight: 500 }}>{match.price}</span></div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 32px 1fr", gap: 12, alignItems: "center" }}>
+                  <div style={{ background: "rgba(255,255,255,.02)", border: "1px solid #111", padding: 16 }}>
+                    <div style={{ fontSize: 9, color: "#333", marginBottom: 8, textTransform: "uppercase", letterSpacing: 3 }}>Recherche</div>
+                    <div style={{ fontSize: 15, color: "#bbb", marginBottom: 6 }}>{s.title}</div>
+                    {s.budget && <div style={{ fontSize: 12, color: "#444", marginBottom: 8 }}>Budget : {s.budget}</div>}
+                    <span className="uid-badge">{dealer(s.dealer_id)?.uid}</span>
+                  </div>
+                  <div style={{ textAlign: "center", color: "#222", fontSize: 18 }}>⟷</div>
+                  <div style={{ background: "rgba(110,184,122,.03)", border: "1px solid rgba(110,184,122,.1)", padding: 16 }}>
+                    <div style={{ fontSize: 9, color: "#333", marginBottom: 8, textTransform: "uppercase", letterSpacing: 3 }}>Inventaire</div>
+                    <div style={{ fontSize: 15, color: "#bbb", marginBottom: 4 }}>{w.title}</div>
+                    <div style={{ fontSize: 12, color: "#555", marginBottom: 8 }}>{w.artist}{w.year ? `, ${w.year}` : ""}</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}><span className="uid-badge">{dealer(w.dealer_id)?.uid}</span>{w.price && <span style={{ fontSize: 13, fontWeight: 500 }}>{w.price}</span>}</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #0a0a0a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  {dealer(s.dealer_id)?.id !== currentDealer?.id && <button className="btn-ghost" onClick={() => { setChatTarget(dealer(s.dealer_id)); setChatOpen(true); }}>Contacter le chercheur</button>}
+                  {dealer(w.dealer_id)?.id !== currentDealer?.id && <button className="btn-gold" onClick={() => { setChatTarget(dealer(w.dealer_id)); setChatOpen(true); }}>Contacter le vendeur</button>}
                 </div>
               </div>
-              <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #0a0a0a", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button className="btn-gold" onClick={() => { setChatTarget(dealer(s.dealer_id)); setChatOpen(true); }}>Mettre en contact</button>
-              </div>
-            </div>;
-          }).filter(Boolean)}
-          {!searches.some(s => inventory.find(w => (w.tags || []).some(t => (s.tags || []).includes(t)))) && <div style={{ color: "#222", textAlign: "center", padding: "60px 0", fontSize: 14 }}>Aucune correspondance détectée pour l'instant</div>}
-        </div>}
+            ))}
+          </div>;
+        })()}
 
         {view === "dealers" && <div className="fade-up">
           <div style={styles.sectionLabel}>Réseau</div>
