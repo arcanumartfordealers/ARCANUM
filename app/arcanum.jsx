@@ -535,6 +535,7 @@ export default function Arcanum() {
   const [newSearch, setNewSearch] = useState({ title: "", period: "", budget: "", tags: "", direct: true });
   const [invitations, setInvitations] = useState([]);
   const [deals, setDeals] = useState([]);
+  const [newDealsCount, setNewDealsCount] = useState(0);
   const [selectedWork, setSelectedWork] = useState(null);
 
   const toast = msg => { setNotif(msg); setTimeout(() => setNotif(null), 3200); };
@@ -570,6 +571,18 @@ export default function Arcanum() {
   useEffect(() => {
     if (!user) return;
     loadInventory(); loadSearches(); loadDealers();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !ADMINS.includes(user.email)) return;
+    loadDeals();
+    const channel = supabase.channel("admin-deals-feed")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "deals" }, ({ new: deal }) => {
+        setDeals(d => [deal, ...d]);
+        setNewDealsCount(c => c + 1);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   const loadInventory = async () => {
@@ -609,7 +622,8 @@ export default function Arcanum() {
   };
 
   const loadDeals = async () => {
-    const { data } = await supabase.from("deals").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("deals").select("*").order("created_at", { ascending: false });
+    if (error) { console.error("deals load error:", error); return; }
     if (data) setDeals(data);
   };
 
@@ -699,7 +713,10 @@ export default function Arcanum() {
               <button className={`nav-btn ${view === "dealers" ? "active" : ""}`} onClick={() => setView("dealers")}>Marchands</button>
             )}
             {ADMINS.includes(user?.email) && (
-              <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); loadDeals(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
+              <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); loadDeals(); setNewDealsCount(0); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e", position: "relative" }}>
+                Admin
+                {newDealsCount > 0 && <span style={{ position: "absolute", top: 4, right: 4, background: "#dc5050", color: "#fff", borderRadius: "50%", minWidth: 16, height: 16, fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", lineHeight: 1 }}>{newDealsCount}</span>}
+              </button>
             )}
           </nav>
 
@@ -997,17 +1014,23 @@ export default function Arcanum() {
               {deals.map(deal => {
                 const from = dealer(deal.from_dealer);
                 const to = dealer(deal.to_dealer);
+                const work = inventory.find(w => String(w.id) === String(deal.inventory_id));
+                const title = deal.artwork_title || work?.title || "—";
+                const artist = work?.artist;
+                const price = deal.price || work?.price;
                 return (
                   <div key={deal.id} style={{ background: CARD_BG, border: "1px solid rgba(110,184,122,.25)", padding: "16px 22px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(110,184,122,.1)", border: "1px solid rgba(110,184,122,.4)", color: "#6eb87a", textTransform: "uppercase" }}>Confirmée</span>
-                      {deal.created_at && <span style={{ fontSize: 11, color: "#999" }}>{new Date(deal.created_at).toLocaleDateString("fr-FR")}</span>}
+                      {deal.created_at && <span style={{ fontSize: 11, color: "#999" }}>{new Date(deal.created_at).toLocaleDateString("fr-FR")} · {new Date(deal.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</span>}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{deal.artwork_title || "Œuvre non renseignée"}</div>
-                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#666" }}>
-                      <span>Vendeur : <span className="uid-badge" style={{ marginLeft: 4 }}>{from?.uid || deal.from_dealer}</span></span>
-                      <span>Acheteur : <span className="uid-badge" style={{ marginLeft: 4 }}>{to?.uid || deal.to_dealer}</span></span>
-                      {deal.price && <span style={{ color: "#c9a96e", fontWeight: 500 }}>{deal.price}</span>}
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>{title}</div>
+                    {artist && <div style={{ fontSize: 12, color: "#888", marginTop: 2, marginBottom: 8 }}>{artist}</div>}
+                    <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 12, color: "#666", marginTop: 8, alignItems: "center" }}>
+                      <span>Vendeur <span className="uid-badge" style={{ marginLeft: 6 }}>{from?.uid || String(deal.from_dealer).slice(0, 8)}</span></span>
+                      <span style={{ color: "#B0A898" }}>→</span>
+                      <span>Acheteur <span className="uid-badge" style={{ marginLeft: 6 }}>{to?.uid || String(deal.to_dealer).slice(0, 8)}</span></span>
+                      {price && <span style={{ marginLeft: "auto", color: "#c9a96e", fontWeight: 500, fontSize: 13 }}>{price}</span>}
                     </div>
                   </div>
                 );
