@@ -203,6 +203,19 @@ function ChatPanel({ target, currentDealer, artwork, context = "inventory", myIn
   const offerAmount = basePrice > 0 ? Math.round(basePrice * (1 - offerDiscount / 100)) : parsePrice(offerManual);
   const offerPermitted = messages.some(m => m.from === "them" && m.parsed?.type === "a" && m.parsed?.key === "offer_possible" && m.parsed?.value === "Oui");
   const pendingMyOffer = last?.from === "me" && lp?.type === "offer";
+  const dealArtwork = artwork || messages.slice().reverse().find(m => m.parsed?.type === "artwork_proposal")?.parsed;
+  const dealSettled = messages.some(m => m.parsed?.type === "deal_done" || m.parsed?.type === "deal_cancel");
+  const pendingMyDealRequest = !dealSettled && messages.some(m => m.from === "me" && m.parsed?.type === "deal_request");
+  const pendingTheirDealRequest = !dealSettled && last?.from === "them" && lp?.type === "deal_request";
+  const dealDone = messages.some(m => m.parsed?.type === "deal_done");
+  const confirmDeal = async () => {
+    const req = [...messages].reverse().find(m => m.from === "them" && m.parsed?.type === "deal_request");
+    if (!req) return;
+    const { artwork_id, artwork_title, price } = req.parsed;
+    if (artwork_id) await supabase.from("inventory").update({ status: "vendu" }).eq("id", artwork_id);
+    await supabase.from("deals").insert({ from_dealer: theirId, to_dealer: myId, inventory_id: artwork_id || null, price: price || "", artwork_title: artwork_title || "" });
+    send({ type: "deal_done", artwork_title: artwork_title || "", price: price || "" });
+  };
 
   const renderBubble = (msg, i) => {
     const isMe = msg.from === "me";
@@ -228,6 +241,9 @@ function ChatPanel({ target, currentDealer, artwork, context = "inventory", myIn
     else if (p.type === "a") { label = "Réponse"; text = p.value; }
     else if (p.type === "offer") { label = "Offre"; text = `${Number(p.amount).toLocaleString("fr-FR")} €${p.discount > 0 ? ` (−${p.discount}%)` : ""}`; accent = "#c9a96e"; }
     else if (p.type === "offer_resp") { label = p.accepted ? "Offre acceptée" : "Offre refusée"; text = p.accepted ? `Montant convenu : ${Number(p.amount).toLocaleString("fr-FR")} €` : "Offre déclinée"; accent = p.accepted ? "#6eb87a" : "#dc5050"; }
+    else if (p.type === "deal_request") { label = "Deal Done"; text = isMe ? "En attente de confirmation de l'autre partie…" : "Votre interlocuteur a confirmé la transaction — confirmez-vous ?"; accent = "#c9a96e"; }
+    else if (p.type === "deal_done") { label = "Transaction confirmée"; text = `Transaction confirmée · Arcanum a été notifié${p.artwork_title ? ` · ${p.artwork_title}` : ""}`; accent = "#6eb87a"; }
+    else if (p.type === "deal_cancel") { label = "Transaction annulée"; text = "La transaction a été annulée"; accent = "#dc5050"; }
     else { text = p.value || ""; }
     return (
       <div key={msg.id || i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "82%" }}>
@@ -295,6 +311,18 @@ function ChatPanel({ target, currentDealer, artwork, context = "inventory", myIn
         </div>
       );
     }
+    if (pendingTheirDealRequest) {
+      return (
+        <div style={{ padding: "14px 16px", borderTop: "1px solid #E0D8C8", flexShrink: 0 }}>
+          <div style={{ fontSize: 8, color: "#c9a96e", letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Deal Done</div>
+          <p style={{ fontSize: 13, color: "#555", marginBottom: 16, lineHeight: 1.6 }}>Votre interlocuteur a confirmé la transaction — confirmez-vous ?</p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-gold" style={{ flex: 1 }} onClick={confirmDeal}>Confirmer</button>
+            <button className="btn-ghost" style={{ flex: 1 }} onClick={() => send({ type: "deal_cancel" })}>Annuler</button>
+          </div>
+        </div>
+      );
+    }
     const activeQuestions = context === "search" ? QUESTIONS_SEARCH : QUESTIONS_INVENTORY;
     return (
       <div style={{ padding: "14px 16px", borderTop: "1px solid #E0D8C8", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
@@ -307,6 +335,12 @@ function ChatPanel({ target, currentDealer, artwork, context = "inventory", myIn
         ))}
         {offerPermitted && !pendingMyOffer && (
           <button className="btn-gold" style={{ marginTop: 4 }} onClick={() => setOfferOpen(true)}>Faire une offre</button>
+        )}
+        {dealArtwork && !dealDone && !dealSettled && !pendingMyDealRequest && (
+          <button style={{ marginTop: 4, background: "rgba(110,184,122,.08)", border: "1px solid rgba(110,184,122,.4)", color: "#6eb87a", padding: "9px 18px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}
+            onClick={() => send({ type: "deal_request", artwork_id: dealArtwork.id || dealArtwork.artwork_id || null, artwork_title: dealArtwork.title || dealArtwork.artwork_title || "", price: dealArtwork.price || "" })}>
+            Deal Done
+          </button>
         )}
       </div>
     );
@@ -500,6 +534,7 @@ export default function Arcanum() {
   const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false, photoFile: null, photo_visibility: "sur_demande" });
   const [newSearch, setNewSearch] = useState({ title: "", period: "", budget: "", tags: "", direct: true });
   const [invitations, setInvitations] = useState([]);
+  const [deals, setDeals] = useState([]);
   const [selectedWork, setSelectedWork] = useState(null);
 
   const toast = msg => { setNotif(msg); setTimeout(() => setNotif(null), 3200); };
@@ -571,6 +606,11 @@ export default function Arcanum() {
   const loadInvitations = async () => {
     const { data } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
     if (data) setInvitations(data);
+  };
+
+  const loadDeals = async () => {
+    const { data } = await supabase.from("deals").select("*").order("created_at", { ascending: false });
+    if (data) setDeals(data);
   };
 
   const updateInvitationStatus = async (id, status) => {
@@ -659,7 +699,7 @@ export default function Arcanum() {
               <button className={`nav-btn ${view === "dealers" ? "active" : ""}`} onClick={() => setView("dealers")}>Marchands</button>
             )}
             {ADMINS.includes(user?.email) && (
-              <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
+              <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); loadDeals(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
             )}
           </nav>
 
@@ -947,6 +987,32 @@ export default function Arcanum() {
                 </div>}
               </div>
             ))}
+          </div>
+
+          <div style={{ marginTop: 48 }}>
+            <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 3, marginBottom: 8 }}>Transactions</h1>
+            <p style={{ color: "#555", fontSize: 13, marginBottom: 28 }}>{deals.length} transaction{deals.length !== 1 ? "s" : ""} confirmée{deals.length !== 1 ? "s" : ""}</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {deals.length === 0 && <div style={{ color: "#B0A898", textAlign: "center", padding: "60px 0", fontSize: 14 }}>Aucune transaction</div>}
+              {deals.map(deal => {
+                const from = dealer(deal.from_dealer);
+                const to = dealer(deal.to_dealer);
+                return (
+                  <div key={deal.id} style={{ background: CARD_BG, border: "1px solid rgba(110,184,122,.25)", padding: "16px 22px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(110,184,122,.1)", border: "1px solid rgba(110,184,122,.4)", color: "#6eb87a", textTransform: "uppercase" }}>Confirmée</span>
+                      {deal.created_at && <span style={{ fontSize: 11, color: "#999" }}>{new Date(deal.created_at).toLocaleDateString("fr-FR")}</span>}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{deal.artwork_title || "Œuvre non renseignée"}</div>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#666" }}>
+                      <span>Vendeur : <span className="uid-badge" style={{ marginLeft: 4 }}>{from?.uid || deal.from_dealer}</span></span>
+                      <span>Acheteur : <span className="uid-badge" style={{ marginLeft: 4 }}>{to?.uid || deal.to_dealer}</span></span>
+                      {deal.price && <span style={{ color: "#c9a96e", fontWeight: 500 }}>{deal.price}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>}
       </main>
