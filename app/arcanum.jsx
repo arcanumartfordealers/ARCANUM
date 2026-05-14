@@ -525,9 +525,12 @@ export default function Arcanum() {
           </div>
 
           <nav style={{ display: "flex" }}>
-            {[["feed", "Inventaires"], ["searches", "Recherches"], ["match", "Matching"], ["dealers", "Marchands"], ["messages", "Messages"], ["docs", "Documents"]].map(([k, l]) => (
+            {[["feed", "Inventaires"], ["searches", "Recherches"], ["match", "Matching"], ["messages", "Messages"], ["docs", "Documents"]].map(([k, l]) => (
               <button key={k} className={`nav-btn ${view === k ? "active" : ""}`} onClick={() => setView(k)}>{l}</button>
             ))}
+            {user?.email === "louisvassy@live.fr" && (
+              <button className={`nav-btn ${view === "dealers" ? "active" : ""}`} onClick={() => setView("dealers")}>Marchands</button>
+            )}
             {user?.email === "louisvassy@live.fr" && (
               <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
             )}
