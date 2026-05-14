@@ -179,9 +179,8 @@ function ChatPanel({ target, currentDealer, artwork, onClose }) {
     load();
     const channel = supabase.channel(`chat-${[myId, theirId].sort().join("-")}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: r }) => {
-        const isConv = (String(r.from_dealer) === String(myId) && String(r.to_dealer) === String(theirId)) ||
-                       (String(r.from_dealer) === String(theirId) && String(r.to_dealer) === String(myId));
-        if (isConv) setMessages(m => [...m, { id: r.id, from: String(r.from_dealer) === String(myId) ? "me" : "them", parsed: tryParse(r.text), time: fmt(r.created_at) }]);
+        const fromThem = String(r.from_dealer) === String(theirId) && String(r.to_dealer) === String(myId);
+        if (fromThem) setMessages(m => [...m, { id: r.id, from: "them", parsed: tryParse(r.text), time: fmt(r.created_at) }]);
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [myId, theirId]);
@@ -190,6 +189,7 @@ function ChatPanel({ target, currentDealer, artwork, onClose }) {
 
   const send = async (payload) => {
     if (!myId || !theirId) return;
+    setMessages(m => [...m, { id: `opt-${Date.now()}`, from: "me", parsed: payload, time: fmt(new Date().toISOString()) }]);
     await supabase.from("messages").insert({ from_dealer: myId, to_dealer: theirId, text: JSON.stringify(payload) });
   };
 
