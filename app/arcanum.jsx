@@ -366,6 +366,7 @@ export default function Arcanum() {
   const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false, photoFile: null, photo_visibility: "sur_demande" });
   const [newSearch, setNewSearch] = useState({ title: "", period: "", budget: "", tags: "", direct: true });
   const [invitations, setInvitations] = useState([]);
+  const [selectedWork, setSelectedWork] = useState(null);
 
   const toast = msg => { setNotif(msg); setTimeout(() => setNotif(null), 3200); };
 
@@ -571,7 +572,7 @@ export default function Arcanum() {
             {filteredInv.map((w, i) => {
               const d = dealer(w.dealer_id);
               const isOwn = currentDealer && String(w.dealer_id) === String(currentDealer.id);
-              return <div key={w.id} className="card fade-up" style={{ animationDelay: `${i * 60}ms` }}>
+              return <div key={w.id} className="card fade-up" style={{ animationDelay: `${i * 60}ms`, cursor: "pointer" }} onClick={() => setSelectedWork({ w, d, isOwn })}>
                 <div style={{ position: "relative", overflow: "hidden" }}>
                   {isOwn
                     ? (w.photo_url
@@ -617,7 +618,7 @@ export default function Arcanum() {
                   </div>
                   <div style={{ borderTop: "1px solid #0a0a0a", paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>{(w.tags || []).slice(0, 2).map(t => <span key={t} className="tag" style={{ cursor: "default" }}>{t}</span>)}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
                       {isOwn
                         ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(w.id, "inventory")}>🗑</button>
                         : <><button className="btn-danger" onClick={() => { setReportTarget(w); setReportType("inventory"); }}>⚑</button><button className="btn-ghost" onClick={() => { setChatTarget(d); setChatOpen(true); }}>Contacter</button></>}
@@ -885,6 +886,77 @@ export default function Arcanum() {
       </div>}
 
       {notif && <div style={{ position: "fixed", bottom: 28, right: 28, background: "#fff", color: "#080808", padding: "12px 22px", fontFamily: "'DM Sans',sans-serif", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", zIndex: 300, fontWeight: 500 }}>{notif}</div>}
+
+      {selectedWork && (() => {
+        const { w, d, isOwn } = selectedWork;
+        const condColor = w.condition === "Excellent" ? "#6eb87a" : w.condition === "Bon" ? "#888" : "#c9a96e";
+        const condBorder = w.condition === "Excellent" ? "rgba(110,184,122,.4)" : w.condition === "Bon" ? "rgba(255,255,255,.15)" : "rgba(201,169,110,.4)";
+        const statusLabel = w.status === "available" ? "Disponible" : w.status === "reserved" ? "Réservé" : "Vendu";
+        const statusColor = w.status === "available" ? "#fff" : w.status === "reserved" ? "#6e8ec9" : "#dc5050";
+        return (
+          <div onClick={() => setSelectedWork(null)} style={{ position: "fixed", inset: "0", background: "rgba(0,0,0,0.88)", zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#0c0c0c", border: "1px solid #1a1a1a", width: "100%", maxWidth: 780, maxHeight: "92vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
+              {/* Photo */}
+              <div style={{ position: "relative", background: "#0e0e0e" }}>
+                {isOwn
+                  ? (w.photo_url
+                      ? <WatermarkedPhoto src={w.photo_url} uid={currentDealer?.uid} />
+                      : <WatermarkedImage color="#6a5545" uid={currentDealer?.uid} />)
+                  : w.photo_url && w.photo_visibility === "public"
+                    ? <WatermarkedPhoto src={w.photo_url} uid={d?.uid || "ARC"} />
+                    : w.photo_url && w.photo_visibility === "privee"
+                      ? <div style={{ width: "100%", aspectRatio: "16/9", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#333" strokeWidth="1.2"/><path d="M9 11V8a5 5 0 0110 0v3" stroke="#333" strokeWidth="1.2"/><circle cx="14" cy="18" r="2" fill="#333"/></svg>
+                          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#333", textTransform: "uppercase" }}>Photo privée</span>
+                        </div>
+                      : <div style={{ width: "100%", aspectRatio: "16/9", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#1a1a1a" strokeWidth="1.2"/><path d="M9 11V8a5 5 0 0110 0v3" stroke="#1a1a1a" strokeWidth="1.2"/><circle cx="14" cy="18" r="2" fill="#1a1a1a"/></svg>
+                          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#1a1a1a", textTransform: "uppercase" }}>Photos sur demande</span>
+                        </div>}
+                {w.direct && <div style={{ position: "absolute", top: 14, left: 14 }}><span className="direct-badge">Directe</span></div>}
+                {isOwn && <div style={{ position: "absolute", top: 14, right: 14 }}><span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(201,169,110,.12)", border: "1px solid rgba(201,169,110,.4)", color: "#c9a96e", textTransform: "uppercase" }}>Mon œuvre</span></div>}
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: "32px 36px 36px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div>
+                    <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 30, letterSpacing: 2, color: "#fff", lineHeight: 1 }}>{w.title}</h2>
+                    <div style={{ fontSize: 15, color: "#666", marginTop: 6 }}>{w.artist}{w.year ? `, ${w.year}` : ""}</div>
+                  </div>
+                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "4px 10px", border: `1px solid ${statusColor}`, color: statusColor, textTransform: "uppercase", whiteSpace: "nowrap", marginTop: 4 }}>{statusLabel}</span>
+                </div>
+
+                <div style={{ height: 1, background: "#111", margin: "20px 0" }} />
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 32px", marginBottom: 20 }}>
+                  {w.medium && <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>Technique</div><div style={{ fontSize: 14, color: "#aaa" }}>{w.medium}</div></div>}
+                  {w.dimensions && <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>Dimensions</div><div style={{ fontSize: 14, color: "#aaa" }}>{w.dimensions}</div></div>}
+                  {w.weight && <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>Poids</div><div style={{ fontSize: 14, color: "#aaa" }}>{w.weight}</div></div>}
+                  {w.condition && <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>État</div><span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 1.5, padding: "3px 9px", border: `1px solid ${condBorder}`, color: condColor, textTransform: "uppercase" }}>{w.condition}</span></div>}
+                  {w.certificate != null && <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>Certificat d'authenticité</div><div style={{ fontSize: 14, color: "#aaa" }}>{w.certificate ? "Oui" : "Non"}</div></div>}
+                  <div><div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 4 }}>Marchand</div><span className="uid-badge">{d?.uid || "—"}</span></div>
+                </div>
+
+                {(w.tags || []).length > 0 && <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, color: "#333", textTransform: "uppercase", marginBottom: 8 }}>Tags</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{(w.tags || []).map(t => <span key={t} className="tag" style={{ cursor: "default" }}>{t}</span>)}</div>
+                </div>}
+
+                <div style={{ height: 1, background: "#111", margin: "20px 0" }} />
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 22, fontWeight: 500, color: "#fff" }}>{w.price}</span>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {!isOwn && <button className="btn-gold" onClick={() => { setSelectedWork(null); setChatTarget(d); setChatOpen(true); }}>Contacter</button>}
+                    <button className="btn-ghost" onClick={() => setSelectedWork(null)}>Fermer</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
