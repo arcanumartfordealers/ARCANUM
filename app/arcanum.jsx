@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 
 const DARK = "#F5F0E8";
 const CARD_BG = "#FFFDF8";
+const ADMINS = ["louisvassy@live.fr", "tomdavib@icloud.com"];
 
 function shadeColor(hex, pct) {
   hex = hex.replace("#", "");
@@ -654,10 +655,10 @@ export default function Arcanum() {
             {[["feed", "Inventaires"], ["searches", "Recherches"], ["match", "Matching"], ["messages", "Messages"], ["docs", "Documents"]].map(([k, l]) => (
               <button key={k} className={`nav-btn ${view === k ? "active" : ""}`} onClick={() => setView(k)}>{l}</button>
             ))}
-            {user?.email === "louisvassy@live.fr" && (
+            {ADMINS.includes(user?.email) && (
               <button className={`nav-btn ${view === "dealers" ? "active" : ""}`} onClick={() => setView("dealers")}>Marchands</button>
             )}
-            {user?.email === "louisvassy@live.fr" && (
+            {ADMINS.includes(user?.email) && (
               <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
             )}
           </nav>
@@ -924,7 +925,7 @@ export default function Arcanum() {
           </div>
         </div>}
 
-        {view === "admin" && user?.email === "louisvassy@live.fr" && <div className="fade-up">
+        {view === "admin" && ADMINS.includes(user?.email) && <div className="fade-up">
           <div style={styles.sectionLabel}>Administration</div>
           <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 3, marginBottom: 8 }}>Invitations</h1>
           <p style={{ color: "#555", fontSize: 13, marginBottom: 28 }}>{invitations.filter(i => i.status === "pending").length} en attente · {invitations.filter(i => i.status === "approved").length} approuvées · {invitations.filter(i => i.status === "refused").length} refusées</p>
