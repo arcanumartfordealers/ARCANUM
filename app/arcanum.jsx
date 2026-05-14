@@ -104,11 +104,17 @@ function AuthScreen({ onLogin }) {
   };
   return (
     <div style={{ background: DARK, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300&family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=DM+Sans:wght@300;400;500&family=Bebas+Neue&display=swap');`}</style>
       <div style={{ width: 400, padding: 40, background: "#FFFDF8", border: "1px solid #E0D8C8" }}>
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, letterSpacing: 6, color: "#1a1a1a" }}>ARCANUM</div>
-          <div style={{ fontSize: 9, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase", marginTop: 4 }}>Réseau Privé</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, fontSize: 34, letterSpacing: 2 }}>ARCANUM</div>
+            <div style={{ width: 1, height: 30, background: "#C0B8A8", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <div style={{ fontSize: 8, letterSpacing: 2, color: "#B0A898", textTransform: "uppercase", lineHeight: 1.3 }}>RÉSEAU</div>
+              <div style={{ fontSize: 8, letterSpacing: 2, color: "#B0A898", textTransform: "uppercase", lineHeight: 1.3 }}>PRIVÉ</div>
+            </div>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 1, marginBottom: 24 }}>
@@ -608,7 +614,7 @@ export default function Arcanum() {
   return (
     <div style={{ fontFamily: "'DM Sans',sans-serif", background: DARK, minHeight: "100vh", color: "#1a1a1a" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300&family=DM+Sans:wght@200;300;400;500&family=Bebas+Neue&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=DM+Sans:wght@200;300;400;500&family=Bebas+Neue&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         ::-webkit-scrollbar{width:2px;} ::-webkit-scrollbar-thumb{background:#C8C0B0;}
         input,textarea{font-family:'DM Sans',sans-serif!important;}
@@ -635,9 +641,13 @@ export default function Arcanum() {
 
       <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(245,240,232,0.98)", backdropFilter: "blur(20px)", borderBottom: "1px solid #E8E0D0" }}>
         <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 32px", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontWeight: 300, fontSize: 28, letterSpacing: 6, color: "#1a1a1a" }}>ARCANUM</div>
-            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 7.5, letterSpacing: 3, color: "#B0A898", textTransform: "uppercase" }}>Réseau Privé · {currentDealer?.uid || "..."}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 300, fontSize: 34, letterSpacing: 2 }}>ARCANUM</div>
+            <div style={{ width: 1, height: 30, background: "#C0B8A8", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <div style={{ fontSize: 8, letterSpacing: 2, color: "#B0A898", textTransform: "uppercase", lineHeight: 1.3 }}>RÉSEAU</div>
+              <div style={{ fontSize: 8, letterSpacing: 2, color: "#B0A898", textTransform: "uppercase", lineHeight: 1.3 }}>PRIVÉ</div>
+            </div>
           </div>
 
           <nav style={{ display: "flex" }}>
