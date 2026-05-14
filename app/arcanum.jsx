@@ -138,19 +138,26 @@ function AuthScreen({ onLogin }) {
   );
 }
 
-const QUESTIONS = [
+const QUESTIONS_INVENTORY = [
   { key: "availability",    label: "L'œuvre est-elle toujours disponible ?",  answers: ["Oui, disponible", "Non, vendue", "Bloquée pour une offre en cours"] },
   { key: "offer_possible",  label: "Est-il possible de faire une offre ?",     answers: ["Oui", "Non"] },
   { key: "location",        label: "Où est l'œuvre ?",                          type: "select", cities: ["Paris", "Londres", "New York", "Genève", "Zurich", "Hong Kong", "Dubaï", "Monaco", "Berlin", "Milan", "Madrid", "Tokyo", "Los Angeles", "Bruxelles", "Amsterdam"] },
   { key: "condition_report", label: "Avez-vous un condition report ?",          answers: ["Oui, je peux le partager", "Non"] },
 ];
+const QUESTIONS_SEARCH = [
+  { key: "available_match",   label: "Avez-vous trouvé une œuvre correspondante ?", answers: ["Oui", "Pas encore", "Recherche abandonnée"] },
+  { key: "artwork_picker",    label: "Je voudrais vous soumettre une œuvre",         type: "artwork_picker" },
+  { key: "budget_negotiable", label: "Le budget est-il négociable ?",                answers: ["Oui, dans une certaine mesure", "Non, budget fixe"] },
+  { key: "search_active",     label: "La recherche est-elle toujours active ?",      answers: ["Oui, toujours active", "Non, clôturée"] },
+];
 
-function ChatPanel({ target, currentDealer, artwork, onClose }) {
+function ChatPanel({ target, currentDealer, artwork, context = "inventory", myInventory = [], onClose }) {
   const [messages, setMessages] = useState([]);
   const [offerOpen, setOfferOpen] = useState(false);
   const [offerDiscount, setOfferDiscount] = useState(0);
   const [offerManual, setOfferManual] = useState("");
   const [locationChoice, setLocationChoice] = useState("");
+  const [artworkPickerOpen, setArtworkPickerOpen] = useState(false);
   const bottomRef = useRef(null);
   const myId = currentDealer?.id;
   const theirId = target?.id;
@@ -193,6 +200,22 @@ function ChatPanel({ target, currentDealer, artwork, onClose }) {
   const renderBubble = (msg, i) => {
     const isMe = msg.from === "me";
     const p = msg.parsed;
+    if (p.type === "artwork_proposal") {
+      return (
+        <div key={msg.id || i} className="mb" style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "82%" }}>
+          <div style={{ fontSize: 8, color: "#555", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4, textAlign: isMe ? "right" : "left" }}>Proposition d'œuvre</div>
+          <div style={{ background: isMe ? "rgba(0,0,0,0.07)" : "rgba(0,0,0,0.03)", border: `1px solid ${isMe ? "rgba(0,0,0,0.12)" : "#E0D8C8"}`, borderRadius: isMe ? "8px 8px 2px 8px" : "8px 8px 8px 2px", overflow: "hidden" }}>
+            {p.photo_url && <WatermarkedPhoto src={p.photo_url} uid={isMe ? currentDealer?.uid : target?.uid} />}
+            <div style={{ padding: "10px 14px" }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a1a" }}>{p.title}</div>
+              {p.artist && <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{p.artist}</div>}
+              {p.price && <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{p.price}</div>}
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: "#999", marginTop: 3, textAlign: isMe ? "right" : "left" }}>{msg.time}</div>
+        </div>
+      );
+    }
     let label = "", text = "", accent = null;
     if (p.type === "q") { label = "Question"; text = p.label; }
     else if (p.type === "a") { label = "Réponse"; text = p.value; }
@@ -213,7 +236,7 @@ function ChatPanel({ target, currentDealer, artwork, onClose }) {
       return <div style={{ padding: "16px", borderTop: "1px solid #E0D8C8", color: "#B0A898", fontSize: 10, letterSpacing: 2, textTransform: "uppercase", textAlign: "center", flexShrink: 0 }}>En attente de réponse…</div>;
     }
     if (last?.from === "them" && lp?.type === "q") {
-      const q = QUESTIONS.find(q => q.key === lp.key);
+      const q = [...QUESTIONS_INVENTORY, ...QUESTIONS_SEARCH].find(q => q.key === lp.key);
       if (!q) return null;
       return (
         <div style={{ padding: "14px 16px", borderTop: "1px solid #E0D8C8", flexShrink: 0 }}>
@@ -243,11 +266,37 @@ function ChatPanel({ target, currentDealer, artwork, onClose }) {
         </div>
       );
     }
+    if (artworkPickerOpen) {
+      return (
+        <div style={{ padding: "14px 16px", borderTop: "1px solid #E0D8C8", flexShrink: 0, maxHeight: 280, overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <div style={{ fontSize: 8, color: "#B0A898", letterSpacing: 2, textTransform: "uppercase" }}>Sélectionner une œuvre</div>
+            <button onClick={() => setArtworkPickerOpen(false)} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 14 }}>✕</button>
+          </div>
+          {myInventory.length === 0
+            ? <div style={{ fontSize: 12, color: "#B0A898", textAlign: "center", padding: "12px 0" }}>Aucune œuvre dans votre inventaire</div>
+            : <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {myInventory.map(w => (
+                  <button key={w.id} className="btn-ghost" style={{ textAlign: "left", padding: "10px 14px" }}
+                    onClick={() => { send({ type: "artwork_proposal", artwork_id: w.id, title: w.title, artist: w.artist || "", price: w.price || "", photo_url: w.photo_url || null }); setArtworkPickerOpen(false); }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{w.title}</div>
+                    {w.artist && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{w.artist}</div>}
+                    {w.price && <div style={{ fontSize: 11, color: "#c9a96e", marginTop: 1 }}>{w.price}</div>}
+                  </button>
+                ))}
+              </div>}
+        </div>
+      );
+    }
+    const activeQuestions = context === "search" ? QUESTIONS_SEARCH : QUESTIONS_INVENTORY;
     return (
       <div style={{ padding: "14px 16px", borderTop: "1px solid #E0D8C8", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
         <div style={{ fontSize: 8, color: "#B0A898", letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>Questions</div>
-        {QUESTIONS.map(q => (
-          <button key={q.key} className="btn-ghost" style={{ textAlign: "left", fontSize: 12, padding: "8px 14px" }} onClick={() => send({ type: "q", key: q.key, label: q.label })}>{q.label}</button>
+        {activeQuestions.map(q => (
+          <button key={q.key} className="btn-ghost" style={{ textAlign: "left", fontSize: 12, padding: "8px 14px" }}
+            onClick={() => q.type === "artwork_picker" ? setArtworkPickerOpen(true) : send({ type: "q", key: q.key, label: q.label })}>
+            {q.label}
+          </button>
         ))}
         {offerPermitted && !pendingMyOffer && (
           <button className="btn-gold" style={{ marginTop: 4 }} onClick={() => setOfferOpen(true)}>Faire une offre</button>
@@ -432,7 +481,8 @@ export default function Arcanum() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatTarget, setChatTarget] = useState(null);
   const [chatArtwork, setChatArtwork] = useState(null);
-  const openChat = (target, artwork = null) => { setChatTarget(target); setChatArtwork(artwork); setChatOpen(true); };
+  const [chatContext, setChatContext] = useState("inventory");
+  const openChat = (target, artwork = null, ctx = "inventory") => { setChatTarget(target); setChatArtwork(artwork); setChatContext(ctx); setChatOpen(true); };
   const [showInvite, setShowInvite] = useState(false);
   const [showContracts, setShowContracts] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
@@ -733,7 +783,7 @@ export default function Arcanum() {
                     <div style={{ display: "flex", gap: 6 }}>
                       {isOwnSearch
                         ? <button className="btn-danger" title="Supprimer" onClick={() => deleteItem(s.id, "searches")}>🗑</button>
-                        : <><button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button><button className="btn-ghost" onClick={() => openChat(d)}>Je peux aider</button></>}
+                        : <><button className="btn-danger" onClick={() => { setReportTarget(s); setReportType("search"); }}>⚑</button><button className="btn-ghost" onClick={() => openChat(d, null, "search")}>Je peux aider</button></>}
                     </div>
                   </div>
                 </div>
@@ -798,7 +848,7 @@ export default function Arcanum() {
                   </div>
                 </div>
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #E8E0D0", display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                  {dealer(s.dealer_id)?.id !== currentDealer?.id && <button className="btn-ghost" onClick={() => openChat(dealer(s.dealer_id))}>Contacter le chercheur</button>}
+                  {dealer(s.dealer_id)?.id !== currentDealer?.id && <button className="btn-ghost" onClick={() => openChat(dealer(s.dealer_id), null, "search")}>Contacter le chercheur</button>}
                   {dealer(w.dealer_id)?.id !== currentDealer?.id && <button className="btn-gold" onClick={() => openChat(dealer(w.dealer_id), w)}>Contacter le vendeur</button>}
                 </div>
               </div>
@@ -890,7 +940,7 @@ export default function Arcanum() {
         </div>}
       </main>
 
-      {chatOpen && chatTarget && <ChatPanel target={chatTarget} currentDealer={currentDealer} artwork={chatArtwork} onClose={() => { setChatOpen(false); setChatArtwork(null); }} />}
+      {chatOpen && chatTarget && <ChatPanel target={chatTarget} currentDealer={currentDealer} artwork={chatArtwork} context={chatContext} myInventory={inventory.filter(w => String(w.dealer_id) === String(currentDealer?.id))} onClose={() => { setChatOpen(false); setChatArtwork(null); setChatContext("inventory"); }} />}
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} currentDealer={currentDealer} onSent={uid => toast(`Invitation envoyée · ${uid} réservé`)} />}
       {showContracts && <ContractModal onClose={() => setShowContracts(false)} />}
 
