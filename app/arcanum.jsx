@@ -51,6 +51,47 @@ function WatermarkedImage({ color = "#5a4535", uid = "ARC-0041" }) {
   return <canvas ref={canvasRef} width={320} height={220} style={{ width: "100%", height: "auto", display: "block", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />;
 }
 
+function WatermarkedPhoto({ src, uid = "ARC-0041" }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !src) return;
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const ratio = img.naturalHeight / img.naturalWidth;
+      canvas.width = 640;
+      canvas.height = Math.round(640 * ratio);
+      const W = canvas.width, H = canvas.height;
+      ctx.drawImage(img, 0, 0, W, H);
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.rotate(-Math.PI / 6);
+      ctx.font = `bold ${Math.max(10, Math.floor(W / 32))}px sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.14)";
+      ctx.textAlign = "center";
+      for (let row = -4; row <= 4; row++)
+        for (let col = -3; col <= 3; col++)
+          ctx.fillText(`ARCANUM · ${uid} · CONFIDENTIEL`, col * 240, row * 56);
+      ctx.restore();
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, H - 28, W, 28);
+      ctx.fillStyle = "rgba(255,255,255,0.38)";
+      ctx.font = "9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(`© ARCANUM RÉSEAU PRIVÉ · ${uid} · NE PAS DIFFUSER`, W / 2, H - 10);
+    };
+    img.onerror = () => {
+      canvas.width = 320; canvas.height = 220;
+      ctx.fillStyle = "#0e0e0e";
+      ctx.fillRect(0, 0, 320, 220);
+    };
+    img.src = src;
+  }, [src, uid]);
+  return <canvas ref={canvasRef} style={{ width: "100%", height: "auto", display: "block", userSelect: "none", WebkitUserSelect: "none", pointerEvents: "none" }} />;
+}
+
 function AuthScreen({ onLogin }) {
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -68,9 +109,9 @@ function AuthScreen({ onLogin }) {
 
   const handleRegister = async () => {
     setLoading(true); setError("");
-    const { data: inv } = await supabase.from("invitations").select("email").eq("email", email.trim().toLowerCase()).maybeSingle();
+    const { data: inv } = await supabase.from("invitations").select("email, status").eq("email", email.trim().toLowerCase()).eq("status", "approved").maybeSingle();
     if (!inv) {
-      setError("Cette adresse n'est pas sur la liste d'invitations. Arcanum est un réseau fermé sur invitation uniquement.");
+      setError("Votre invitation n'a pas encore été approuvée, ou cette adresse n'est pas invitée.");
       setLoading(false);
       return;
     }
@@ -211,7 +252,7 @@ function InviteModal({ onClose, currentDealer, onSent }) {
 
   const send = async () => {
     if (!email.trim()) return;
-    await supabase.from("invitations").insert({ email, uid, invited_by: currentDealer?.id || null });
+    await supabase.from("invitations").insert({ email, uid, invited_by: currentDealer?.id || null, status: "pending" });
     setSent(true);
     setTimeout(() => { onSent(uid); onClose(); }, 1800);
   };
@@ -340,8 +381,9 @@ export default function Arcanum() {
   const [addItem, setAddItem] = useState(false);
   const [addSearch, setAddSearch] = useState(false);
   const [notif, setNotif] = useState(null);
-  const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false });
+  const [newItem, setNewItem] = useState({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false, photoFile: null, photo_visibility: "sur_demande" });
   const [newSearch, setNewSearch] = useState({ title: "", period: "", budget: "", tags: "", direct: true });
+  const [invitations, setInvitations] = useState([]);
 
   const toast = msg => { setNotif(msg); setTimeout(() => setNotif(null), 3200); };
 
@@ -393,10 +435,31 @@ export default function Arcanum() {
     if (data) setDealers(data);
   };
 
+  const uploadPhoto = async (file) => {
+    const ext = file.name.split(".").pop();
+    const path = `${currentDealer?.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("artwork-images").upload(path, file, { upsert: true });
+    if (error) { toast("Erreur upload photo"); return null; }
+    return supabase.storage.from("artwork-images").getPublicUrl(path).data.publicUrl;
+  };
+
   const submitItem = async () => {
     if (!newItem.title || !newItem.artist) return;
-    await supabase.from("inventory").insert({ title: newItem.title, artist: newItem.artist, year: parseInt(newItem.year) || new Date().getFullYear(), medium: newItem.medium, price: newItem.price, dealer_id: currentDealer?.id, direct: newItem.direct, tags: newItem.tags.split(",").map(t => t.trim()).filter(Boolean), status: "available", dimensions: newItem.dimensions || null, weight: newItem.weight || null, condition: newItem.condition || null, certificate: newItem.certificate });
-    loadInventory(); setNewItem({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false }); setAddItem(false); toast("Œuvre ajoutée");
+    let photo_url = null;
+    if (newItem.photoFile) photo_url = await uploadPhoto(newItem.photoFile);
+    await supabase.from("inventory").insert({ title: newItem.title, artist: newItem.artist, year: parseInt(newItem.year) || new Date().getFullYear(), medium: newItem.medium, price: newItem.price, dealer_id: currentDealer?.id, direct: newItem.direct, tags: newItem.tags.split(",").map(t => t.trim()).filter(Boolean), status: "available", dimensions: newItem.dimensions || null, weight: newItem.weight || null, condition: newItem.condition || null, certificate: newItem.certificate, photo_url, photo_visibility: newItem.photoFile ? newItem.photo_visibility : null });
+    loadInventory(); setNewItem({ title: "", artist: "", year: "", medium: "", price: "", tags: "", direct: true, dimensions: "", weight: "", condition: "Excellent", certificate: false, photoFile: null, photo_visibility: "sur_demande" }); setAddItem(false); toast("Œuvre ajoutée");
+  };
+
+  const loadInvitations = async () => {
+    const { data } = await supabase.from("invitations").select("*").order("created_at", { ascending: false });
+    if (data) setInvitations(data);
+  };
+
+  const updateInvitationStatus = async (id, status) => {
+    await supabase.from("invitations").update({ status }).eq("id", id);
+    loadInvitations();
+    toast(status === "approved" ? "Invitation approuvée" : "Invitation refusée");
   };
 
   const deleteItem = async (id, table) => {
@@ -482,6 +545,9 @@ export default function Arcanum() {
             {[["feed", "Inventaires"], ["searches", "Recherches"], ["match", "Matching"], ["dealers", "Marchands"], ["messages", "Messages"], ["docs", "Documents"]].map(([k, l]) => (
               <button key={k} className={`nav-btn ${view === k ? "active" : ""}`} onClick={() => setView(k)}>{l}</button>
             ))}
+            {user?.email === "louisvassy@live.fr" && (
+              <button className={`nav-btn ${view === "admin" ? "active" : ""}`} onClick={() => { setView("admin"); loadInvitations(); }} style={{ color: view === "admin" ? "#fff" : "#c9a96e" }}>Admin</button>
+            )}
           </nav>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -525,15 +591,25 @@ export default function Arcanum() {
               const isOwn = currentDealer && String(w.dealer_id) === String(currentDealer.id);
               return <div key={w.id} className="card fade-up" style={{ animationDelay: `${i * 60}ms` }}>
                 <div style={{ position: "relative", overflow: "hidden" }}>
-                  {isOwn ? <WatermarkedImage color="#6a5545" uid={currentDealer?.uid} /> :
-                    <div style={{ width: "100%", aspectRatio: "4/3", background: "#0e0e0e", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#1a1a1a" strokeWidth="1.2" /><path d="M9 11V8a5 5 0 0110 0v3" stroke="#1a1a1a" strokeWidth="1.2" /><circle cx="14" cy="18" r="2" fill="#1a1a1a" /></svg>
-                      <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#1a1a1a", textTransform: "uppercase" }}>Photos sur demande</span>
-                      <button onClick={() => { setChatTarget(d); setChatOpen(true); setTimeout(() => { window.__arcanum_prefill__ = `Bonjour, je souhaite accéder aux photos de « ${w.title} » (${w.artist}, ${w.year}).`; }, 100); }}
-                        style={{ marginTop: 4, background: "none", border: "1px solid #111", color: "#2a2a2a", padding: "6px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase" }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#fff"; e.currentTarget.style.color = "#fff"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#111"; e.currentTarget.style.color = "#2a2a2a"; }}>Demander l'accès</button>
-                    </div>}
+                  {isOwn
+                    ? (w.photo_url
+                        ? <WatermarkedPhoto src={w.photo_url} uid={currentDealer?.uid} />
+                        : <WatermarkedImage color="#6a5545" uid={currentDealer?.uid} />)
+                    : w.photo_url && w.photo_visibility === "public"
+                      ? <WatermarkedPhoto src={w.photo_url} uid={d?.uid || "ARC"} />
+                      : w.photo_url && w.photo_visibility === "privee"
+                        ? <div style={{ width: "100%", aspectRatio: "4/3", background: "#0e0e0e", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                            <svg width="22" height="22" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#333" strokeWidth="1.2"/><path d="M9 11V8a5 5 0 0110 0v3" stroke="#333" strokeWidth="1.2"/><circle cx="14" cy="18" r="2" fill="#333"/></svg>
+                            <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#333", textTransform: "uppercase" }}>Photo privée</span>
+                          </div>
+                        : <div style={{ width: "100%", aspectRatio: "4/3", background: "#0e0e0e", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="4" y="11" width="20" height="14" rx="1" stroke="#1a1a1a" strokeWidth="1.2"/><path d="M9 11V8a5 5 0 0110 0v3" stroke="#1a1a1a" strokeWidth="1.2"/><circle cx="14" cy="18" r="2" fill="#1a1a1a"/></svg>
+                            <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 3, color: "#1a1a1a", textTransform: "uppercase" }}>Photos sur demande</span>
+                            <button onClick={() => { setChatTarget(d); setChatOpen(true); setTimeout(() => { window.__arcanum_prefill__ = `Bonjour, je souhaite accéder aux photos de « ${w.title} » (${w.artist}, ${w.year}).`; }, 100); }}
+                              style={{ marginTop: 4, background: "none", border: "1px solid #111", color: "#2a2a2a", padding: "6px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 2, textTransform: "uppercase" }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = "#fff"; e.currentTarget.style.color = "#fff"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = "#111"; e.currentTarget.style.color = "#2a2a2a"; }}>Demander l'accès</button>
+                          </div>}
                   {w.direct && <div style={{ position: "absolute", top: 10, left: 10 }}><span className="direct-badge">Directe</span></div>}
                   {isOwn && <div style={{ position: "absolute", top: 10, right: 10 }}><span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", background: "rgba(201,169,110,.12)", border: "1px solid rgba(201,169,110,.4)", color: "#c9a96e", textTransform: "uppercase" }}>Mon œuvre</span></div>}
                 </div>
@@ -706,6 +782,31 @@ export default function Arcanum() {
             ))}
           </div>
         </div>}
+
+        {view === "admin" && user?.email === "louisvassy@live.fr" && <div className="fade-up">
+          <div style={styles.sectionLabel}>Administration</div>
+          <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, letterSpacing: 3, marginBottom: 8 }}>Invitations</h1>
+          <p style={{ color: "#555", fontSize: 13, marginBottom: 28 }}>{invitations.filter(i => i.status === "pending").length} en attente · {invitations.filter(i => i.status === "approved").length} approuvées · {invitations.filter(i => i.status === "refused").length} refusées</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {invitations.length === 0 && <div style={{ color: "#333", textAlign: "center", padding: "60px 0", fontSize: 14 }}>Aucune invitation</div>}
+            {invitations.map(inv => (
+              <div key={inv.id} style={{ background: CARD_BG, border: `1px solid ${inv.status === "pending" ? "#1a1a1a" : inv.status === "approved" ? "rgba(110,184,122,.2)" : "rgba(220,80,80,.15)"}`, padding: "16px 22px", display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, color: "#ccc" }}>{inv.email}</div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 4, alignItems: "center" }}>
+                    {inv.uid && <span className="uid-badge">{inv.uid}</span>}
+                    <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 8, letterSpacing: 1.5, padding: "2px 8px", textTransform: "uppercase", border: `1px solid ${inv.status === "pending" ? "#333" : inv.status === "approved" ? "rgba(110,184,122,.4)" : "rgba(220,80,80,.4)"}`, color: inv.status === "pending" ? "#666" : inv.status === "approved" ? "#6eb87a" : "#dc5050" }}>{inv.status || "pending"}</span>
+                    {inv.created_at && <span style={{ fontSize: 11, color: "#333" }}>{new Date(inv.created_at).toLocaleDateString("fr-FR")}</span>}
+                  </div>
+                </div>
+                {inv.status === "pending" && <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => updateInvitationStatus(inv.id, "approved")} style={{ background: "rgba(110,184,122,.1)", border: "1px solid rgba(110,184,122,.4)", color: "#6eb87a", padding: "7px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>Approuver</button>
+                  <button onClick={() => updateInvitationStatus(inv.id, "refused")} style={{ background: "none", border: "1px solid rgba(220,80,80,.3)", color: "#dc5050", padding: "7px 16px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase" }}>Refuser</button>
+                </div>}
+              </div>
+            ))}
+          </div>
+        </div>}
       </main>
 
       {chatOpen && chatTarget && <ChatPanel target={chatTarget} onClose={() => setChatOpen(false)} />}
@@ -730,6 +831,23 @@ export default function Arcanum() {
           <h2 style={styles.modalTitle}>Ajouter une œuvre</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[["title", "Titre *"], ["artist", "Artiste *"], ["year", "Année"], ["medium", "Technique / support"], ["price", "Prix"], ["tags", "Tags (séparés par virgule)"]].map(([k, ph]) => <input key={k} className="inp" placeholder={ph} value={newItem[k]} onChange={e => setNewItem({ ...newItem, [k]: e.target.value })} />)}
+            <div>
+              <div style={{ fontSize: 9, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Photo de l'œuvre</div>
+              <input type="file" accept="image/*" style={{ ...styles.input, cursor: "pointer", color: "#888" }} onChange={e => setNewItem({ ...newItem, photoFile: e.target.files?.[0] || null })} />
+            </div>
+            {newItem.photoFile && <div>
+              <div style={{ fontSize: 9, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 6 }}>Visibilité</div>
+              <div style={{ display: "flex", gap: 1 }}>
+                {[["Publique", "public"], ["Sur demande", "sur_demande"], ["Privée", "privee"]].map(([l, v]) => (
+                  <button key={v} type="button" onClick={() => setNewItem({ ...newItem, photo_visibility: v })} style={{ flex: 1, background: newItem.photo_visibility === v ? "#fff" : "none", border: "1px solid #1a1a1a", color: newItem.photo_visibility === v ? "#080808" : "#555", padding: "9px 4px", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", transition: "all .15s" }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 11, color: "#444", lineHeight: 1.5 }}>
+                {newItem.photo_visibility === "public" && "Visible par tous les membres avec filigrane ARCANUM."}
+                {newItem.photo_visibility === "sur_demande" && "Les autres voient un bouton pour demander l'accès via chat."}
+                {newItem.photo_visibility === "privee" && "Photo invisible pour les autres membres."}
+              </div>
+            </div>}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <input className="inp" placeholder="Dimensions (ex: 120 × 80 cm)" value={newItem.dimensions} onChange={e => setNewItem({ ...newItem, dimensions: e.target.value })} />
               <input className="inp" placeholder="Poids (ex: 3,2 kg)" value={newItem.weight} onChange={e => setNewItem({ ...newItem, weight: e.target.value })} />
