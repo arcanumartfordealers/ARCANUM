@@ -31,16 +31,6 @@ function WatermarkedImage({ color = "#5a4535", uid = "ARC-0041" }) {
       ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.04})`;
       ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
     }
-    ctx.save();
-    ctx.translate(W / 2, H / 2);
-    ctx.rotate(-Math.PI / 6);
-    ctx.font = "bold 11px sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.1)";
-    ctx.textAlign = "center";
-    for (let row = -2; row <= 2; row++)
-      for (let col = -2; col <= 2; col++)
-        ctx.fillText(`ARCANUM · ${uid} · CONFIDENTIEL`, col * 160, row * 50);
-    ctx.restore();
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(0, H / 2 - 16, W, 32);
     ctx.fillStyle = "rgba(255,255,255,0.6)";
@@ -66,16 +56,6 @@ function WatermarkedPhoto({ src, uid = "ARC-0041" }) {
       canvas.height = Math.round(640 * ratio);
       const W = canvas.width, H = canvas.height;
       ctx.drawImage(img, 0, 0, W, H);
-      ctx.save();
-      ctx.translate(W / 2, H / 2);
-      ctx.rotate(-Math.PI / 6);
-      ctx.font = `bold ${Math.max(10, Math.floor(W / 32))}px sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.14)";
-      ctx.textAlign = "center";
-      for (let row = -4; row <= 4; row++)
-        for (let col = -3; col <= 3; col++)
-          ctx.fillText(`ARCANUM · ${uid} · CONFIDENTIEL`, col * 240, row * 56);
-      ctx.restore();
       ctx.fillStyle = "rgba(0,0,0,0.55)";
       ctx.fillRect(0, H / 2 - 16, W, 32);
       ctx.fillStyle = "rgba(255,255,255,0.6)";
