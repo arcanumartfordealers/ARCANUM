@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 
 const DARK = "#F5F0E8";
 const CARD_BG = "#FFFDF8";
-const ADMINS = ["louisvassy@live.fr", "tomdavib@icloud.com"];
+const ADMINS = ["louisvassy@live.fr", "tomdavidb@icloud.com"];
 
 function shadeColor(hex, pct) {
   hex = hex.replace("#", "");
