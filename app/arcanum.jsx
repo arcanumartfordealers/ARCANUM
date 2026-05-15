@@ -181,10 +181,16 @@ function ChatPanel({ target, currentDealer, artwork, context = "inventory", myIn
     };
     load();
     const channel = supabase.channel(`chat-${[myId, theirId].sort().join("-")}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, ({ new: r }) => {
-        const fromThem = String(r.from_dealer) === String(theirId) && String(r.to_dealer) === String(myId);
-        if (fromThem) setMessages(m => [...m, { id: r.id, from: "them", parsed: tryParse(r.text), time: fmt(r.created_at) }]);
-      }).subscribe();
+      .on("postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: `to_dealer=eq.${myId}` },
+        ({ new: r }) => {
+          if (String(r.from_dealer) !== String(theirId)) return;
+          setMessages(m => [...m, { id: r.id, from: "them", parsed: tryParse(r.text), time: fmt(r.created_at) }]);
+        })
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") console.error("[Realtime] Échec — activez Realtime sur la table messages dans Supabase (voir supabase/enable_realtime.sql)");
+        if (status === "TIMED_OUT") console.warn("[Realtime] Timeout — vérifiez la connexion Supabase");
+      });
     return () => { supabase.removeChannel(channel); };
   }, [myId, theirId]);
 
